@@ -1,10 +1,5 @@
 ## Randomized Binary Search Trees (RBSTs)
 
-### TODO
-
-- [] Generalize keys (instead of Int).
-- [] Handle insert duplicate items.
-
 ### Introduction
 
 Original work: <http://akira.ruc.dk/~keld/teaching/algoritmedesign_f08/Artikler/03/Martinez97.pdf>
