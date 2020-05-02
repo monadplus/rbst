@@ -84,17 +84,6 @@ one :: k -> a -> Tree k a
 one !k !x = Node 1 k Empty x Empty
 {-# INLINEABLE one #-}
 
--- | Create a tree from a list of key\/value pairs.
---
--- > fromList [] == empty
--- > fromList [(5,"a")] == one 5 "a"
---
-fromList :: Ord k => [(k,v)] -> Tree k a
-fromList = foldl' ins empty
-  where
-    ins t (!k,!x) = insert k x t
-{-# INLINEABLE fromList #-}
-
 ----------------------------------------------
 -- Query
 ----------------------------------------------
@@ -153,10 +142,10 @@ insert guess !k1 x node@(Node s !k2 l _ r)
 --
 -- > delete 1 (one (1, "A")) == empty
 --
-delete :: Ord k => k -> Tree k a -> Tree k a
-delete _ Empty = Empty
-delete k1 (Node s k2 l _ r)
-  | k1 == k2  = join l r
+delete :: Ord k => Guess -> k -> Tree k a -> Tree k a
+delete _ _ Empty = Empty
+delete guess k1 (Node s k2 l _ r)
+  | k1 == k2  = join guess l r
   | k1 < k2   = delete k1 l
   | otherwise = delete k1 r
 {-# INLINEABLE delete #-}
