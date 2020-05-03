@@ -31,6 +31,6 @@ let
 in
   doStatic (
     doBench (
-      haskellPackages.callCabal2nix "RBST" ./. {}
+      haskellPackages.callCabal2nix "rbst" ./. {}
     )
   )

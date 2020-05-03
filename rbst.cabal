@@ -1,6 +1,6 @@
 cabal-version:       >= 1.10
 
-name:                RBST
+name:                rbst
 version:             0.1.0.0
 build-type:          Simple
 license:             MIT
@@ -8,8 +8,8 @@ license-file:        LICENSE
 author:              Arnau Abella
 maintainer:          arnauabella@gmail.com
 copyright:           2020 Arnau Abella
-homepage:            https://github.com/monadplus/RBST
-bug-reports:         https://github.com/monadplus/RBST/issues
+homepage:            https://github.com/monadplus/rbst
+bug-reports:         https://github.com/monadplus/rbst/issues
 synopsis:            Randomized Binary Search Trees
 description:
     .
@@ -25,12 +25,14 @@ tested-with:         GHC == 8.8.3
 
 source-repository head
   type:                git
-  location:            https://github.com/monadplus/RBST.git
+  location:            https://github.com/monadplus/rbst.git
 
 Library
   default-language:   Haskell2010
   hs-source-dirs:     src
+
   exposed-modules:    RBST
+                      RBST.Pretty
 
   other-modules:      RBST.Internal
 
@@ -94,7 +96,7 @@ Library
                       UndecidableInstances
                       RoleAnnotations
 
-Test-suite RBST-tests
+Test-suite rbst-tests
   default-language:     Haskell2010
   type:                 exitcode-stdio-1.0
   main-is:              Spec.hs
@@ -102,7 +104,7 @@ Test-suite RBST-tests
 
   other-modules:
 
-  build-depends:        RBST,
+  build-depends:        rbst,
                         base              >=4.12     && <4.14,
                         hspec             >=2.6.0    && <2.8,
                         hspec-core        >=2.6.0    && <2.8,
@@ -162,7 +164,7 @@ Test-suite RBST-tests
                         RoleAnnotations
 
 
-Test-suite RBST-doctest
+Test-suite rbst-doctest
   default-language:    Haskell2010
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
@@ -189,13 +191,13 @@ Test-suite RBST-doctest
 
 
 
-Benchmark RBST-bench
+Benchmark rbst
   default-language: Haskell2010
   type:           exitcode-stdio-1.0
   hs-source-dirs: benchmark
   main-is:        Benchmark.hs
 
-  build-depends:  RBST,
+  build-depends:  rbst,
                   base      >=4.12     && <4.14,
                   gauge     >=0.2.4    && <0.3
 
