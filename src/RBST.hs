@@ -9,7 +9,7 @@
 --
 -- == General description
 --
--- Package @rbst@ implements a self-balancing-tree-like data structure called /Randomized Binary Search Tree/. This data structure behave exactly like a <https://en.wikipedia.org/wiki/Random_binary_tree random_binary_search_tree>, irrespectively of the input data distribution, with fast (logarithmic time complexity) @'RBST.insert'@ \/ @'RBST.delete'@ \/ @'lookup'@ operations.
+-- Package @rbst@ implements a self-balancing-tree-like data structure called /Randomized Binary Search Tree/. This data structure behave exactly like a <https://en.wikipedia.org/wiki/Random_binary_tree random_binary_search_tree>, irrespectively of the input data distribution, with fast (logarithmic time complexity) @'RBST.insert'@ \/ @'RBST.delete'@ \/ @'lookup'@ \/ @'union'@ operations.
 --
 -- == Package structure
 --
@@ -23,6 +23,7 @@
 --
 -- A balanced 'Tree' can be created the following ways:
 --
+-- @
 -- > import qualified RBST
 -- > let empty = RBST.empty :: RBST Int String
 -- > let single = RBST.one 1 'v'
@@ -37,9 +38,11 @@
 --    ╱  ╲
 --   ╱    ╲
 -- X:2     Y:3
+-- @
 --
 -- Then, you can update/query it:
 --
+-- @
 -- > insert "w" 5 tree
 --
 -- > delete "u" tree
@@ -49,6 +52,7 @@
 --
 -- > lookup "w" tree
 -- Nothing
+-- @
 --
 -- == Implementation
 --
@@ -58,28 +62,34 @@
 --
 --------------------------------------------------------------------
 module RBST (
-  -- * Data Types
+
+  -- * Data structure & Instances
     Size(..)
   , Tree(..)
   , RBST(..)
 
-  -- * Construction
+  -- * Construction functions
   , empty
   , one
-  , fromList
 
-  -- * Query
+  -- * Query functions
   , size
   , lookup
 
+  -- * Modification functions
   -- ** Insertion
   , insert
-
   -- ** Deletion
   , delete
 
+  -- * Set operations
+  , union
+  --, intersection
+  --, difference
+
   -- * Reexports
   , module RBST
+
   ) where
 
 import           Prelude       hiding (lookup)

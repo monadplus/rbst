@@ -9,7 +9,7 @@ Efficient implementation of the [Randomized Binary Search Trees][1] data structu
 
 This package implements a self-balancing-tree-like data structure called _Randomized Binary Search Tree_.
 
-This data structure behave exactly like a _Random Binary Search Tree_, irrespectively of the input data distribution, with fast (logarithmic time complexity) `insert`,`delete`,`lookup`,`merge` operations.
+This data structure behave exactly like a _Random Binary Search Tree_, irrespectively of the input data distribution, with fast (logarithmic time complexity) `insert`,`delete`,`lookup`,`union` operations.
 
 ### When to use this package?
 
@@ -18,28 +18,10 @@ _Randomized Binary Search Trees_ are useful when you __cannot make assumptions o
 | Operation | Time complexity |
 |-----------|-----------------|
 | `size`    | `O(1)`          |
+| `lookup`  | `O(log n)`      |
 | `insert`  | `O(log n)`      |
 | `delete`  | `O(log n)`      |
-| `lookup`  | `O(log n)`      |
-| `merge`   | `O(log n)`      |
-
-### Technical background
-
-All self-balancing binary search trees such as _AVLs_, _Red-black trees_, _BB[α]-tree_, _height-ratio-balanced tree_, etc. may suffer from the following:
-
-- `UPDATE`/`DELETE` algorithms are rather complex (requires complex rotations).
-- `UPDATE/DELETE` are _O(log n + c)_, where the constant factor can become large with ease.
-- Tree nodes are required to store balance information needed only to preserve constraints.
-
-A _Randomized BST_ is a _Random BST_ (as proved in the paper), irrespectively of the order of `INSERTION`/`DELETE`. Consequently, the performance is always, with a _constant_ factor, __logarithmic__. For example, an attacker could not force it to be imbalanced.
-
-One of the keys of _RBST_ is that it __always__ generates a _Random Binary Search Tree_, so you can take advantage of all the properties of the _Random Binary Search Tree_.
-
-#### RBSTs vs Randomized Treaps
-
-- RBST generates random integers in the range of [0, _n_], where _n_ is the current size of the RBSTs, while randomized treaps produce unbounded integers in the unit interval (random priorities).
-
-- SEARCH/DELETE are done by structural information (rank of subtree) in RBST, while on Randomized Treaps are done using nonstructural information, _random priority [0,1]_.
+| `union`   | `O(m + n)`      |
 
 ### Acknowledgement
 

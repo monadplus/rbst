@@ -14,45 +14,50 @@
 --
 --------------------------------------------------------------------
 module RBST.Internal (
-  -- * Data Types
+  -- * Data structure & Instances
     Size(..)
   , Tree(..)
   , RBST(..)
 
-  -- * Construction
+  -- * Construction functions
   , defaultRandomGenerator
   , empty
   , emptyWithGen
   , one
   , oneWithGen
-  , fromList
 
-  -- * Query
+  -- * Query functions
   , size
   , sizeTree
   , lookup
 
+  -- * Modification functions
   -- ** Insertion
   , insert
-
   -- ** Deletion
   , delete
 
-  -- * Random
+  -- * Set operations
+  , union
+  --, intersection
+  --, difference
+
+  -- * Randomization functions
   , uniformR
 
-  -- * Internals
-    , withTree
+  -- * Internals functions
+  , withTree
 
   -- * Reexports
   --, module System.Random.Mersenne.Pure64
   ) where
 
-import           Control.DeepSeq               (NFData)
+import           Control.DeepSeq               (NFData (..), rnf)
 import           Data.Bifunctor                (first)
 import           Data.Coerce                   (coerce)
 import           Data.Foldable                 (foldl')
 import           Data.Word                     (Word64)
+import           GHC.Exts                      (IsList (..))
 import           GHC.Generics                  (Generic)
 import           Prelude                       hiding (lookup)
 import qualified System.Random.Mersenne.Pure64 as Random
@@ -60,7 +65,6 @@ import qualified System.Random.Mersenne.Pure64 as Random
 
 -- TODO
 -- [ ] Duplicate Keys
--- [ ] Join + Semigroup + Monoid
 
 -- $setup
 -- >>> import RBST.Pretty
@@ -89,8 +93,49 @@ data RBST k a = RBST
   , rbstTree :: !(Tree k a)
   } deriving stock (Show, Generic, Foldable)
 
+-- | (<>) is implemented via 'merge'.
+instance Semigroup (RBST k a) where
+    (<>) = union
+
+-- | mempty is implemented via 'empty'.
+instance Monoid (RBST k a) where
+    mempty = empty
+
+-- | (==) is implemented via (==) of the underlying 'Tree'.
 instance (Eq k, Eq a) => Eq (RBST k a) where
   (RBST _ tree1) == (RBST _ tree2) = tree1 == tree2
+
+-- | Create a tree from a list of key\/value pairs, and viceversa.
+--
+-- __NOTE__: This requires @{-# LANGUAGE OverloadedLists #-}@ enabled.
+--
+-- Functions have the following time complexity:
+--
+-- 1. 'fromList': \( O(n \cdot \log \ n) \)
+-- 2. 'toList': \( O(n) \).
+--
+-- @
+-- > let tree = fromList @(RBST String Int) [("duck",5), ("lion",3), ("ape",1)]
+--
+-- > toList smallRBST == [('A',1),('B',2),('C',3),('D',4),('E',5)]
+-- @
+instance Ord k => IsList (RBST k a) where
+  type Item (RBST k a) = (k,a)
+
+  fromList :: [(k,a)] -> RBST k a
+  fromList = foldl' ins empty where
+      ins tree (!k,!x) = insert k x tree
+  {-# INLINEABLE fromList #-}
+
+  -- | Inorder traversal.
+  toList :: RBST k a -> [(k,a)]
+  toList RBST{..} = toListTree rbstTree where
+    toListTree Empty            = []
+    toListTree (Node _ k l x r) = toListTree l  ++ (k,x) : toListTree r
+  {-# INLINEABLE toList #-}
+
+instance (NFData k, NFData a) => NFData (RBST k a) where
+    rnf RBST{..} = rnf rbstTree `seq` ()
 
 ----------------------------------------
 -- Construction
@@ -131,17 +176,6 @@ oneWithGen gen = (RBST gen .) . oneTree
 oneTree :: k -> a -> Tree k a
 oneTree k x = Node 1 k Empty x Empty
 {-# INLINE oneTree #-}
-
--- | \( O(n \cdot \log \ n)\). Create a tree from a list of key\/value pairs.
---
--- > fromList [] == empty
--- > fromList [(5,"a")] == one 5 "a"
--- > let tree = fromList [("duck",5), ("lion",3), ("ape",1)]
-fromList :: Ord k => [(k,a)] -> RBST k a
-fromList = foldl' ins empty
-  where
-    ins tree (!k,!x) = insert k x tree
-{-# INLINEABLE fromList #-}
 
 ----------------------------------------------
 -- Query
@@ -220,6 +254,28 @@ delete k1 RBST{..} =
       | k1 < k2   = delete' l
       | otherwise = delete' r
 {-# INLINEABLE delete #-}
+
+----------------------------------------------
+-- Set operations
+----------------------------------------------
+
+-- | \( \theta(m + n) \). Union of two 'RBST' deleting duplicate keys.
+--
+-- The 'union' returns a random BST.
+union :: RBST k a -> RBST k a -> RBST k a
+union = undefined
+
+-- | \( \theta(m + n) \). Intersection of two 'RBST'.
+--
+-- Notice, the intersection do not require randomness to produce a /Random Binary Search Tree/.
+intersect :: RBST k a -> RBST k a -> RBST k a
+intersect = error "Not implemented yet!"
+
+-- | \( \theta(m + n) \). Difference of two 'RBST'.
+--
+-- Notice, the difference do not require randomness to produce a /Random Binary Search Tree/.
+difference :: RBST k a -> RBST k a -> RBST k a
+difference = error "Not implemented yet!"
 
 ----------------------------------------------
 -- Random
@@ -353,6 +409,20 @@ insertRoot k x tree@(Node _ k2 l _ r)
   | k < k2    = rotateR $ updateL tree (insertRoot k x l)
   | otherwise = rotateL $ updateR tree (insertRoot k x r)
 {-# INLINE insertRoot #-}
+
+-- | \(O(\log \n )\. Split the tree \( T \) into two trees \( T_< \) and \( T_> \), which contain the keys of \( T \) that are smaller than x and larger than x, respectively.
+split :: Ord k => k -> RBST k a -> (RBST k a, RBST k a)
+split k RBST{..} = fmap (RBST rbstGen) $ split' rbstTree
+  where
+    split' Empty = (Empty, Empty)
+    split' node@(_ k2 l _ r)
+      | k < k2    =
+          let (t1, t2) = split' l
+           in (t1, updateL node t2)
+      | otherwise =
+          let (t1, t2) = split' r
+           in (updateR node t1, t2)
+{-# INLINE split #-}
 
 -- | \(O(\log \ n )\). Invariant: : All keys from p must be strictly smaller than any key of q.
 --

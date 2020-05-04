@@ -16,8 +16,8 @@ description:
     This package contains an implementation of a [Randomized
     Binary Search Tree](http://akira.ruc.dk/~keld/teaching/algoritmedesign_f08/Artikler/03/Martinez97.pdf).
     .
-    Randomized Binary Search Trees are guaranteed to be _Random Binary Search Trees_ irrespective of the number
-    of insert/delete operations. This guarantees logarithmic time operations (with a constant factor) in the worst case.
+    Randomized Binary Search Trees are guaranteed to be /Random BST/ irrespective of the number
+    of @'insert'@ \/ @'delete'@ operations. This guarantees logarithmic time operations (with a constant factor) in the worst case.
 category:            Data Structures
 extra-source-files:  README.md
                      CHANGELOG.md
@@ -32,7 +32,7 @@ Library
   hs-source-dirs:     src
 
   exposed-modules:    RBST
-                      RBST.Pretty
+                        RBST.Pretty
 
   other-modules:      RBST.Internal
 
@@ -81,6 +81,7 @@ Library
                       KindSignatures
                       LambdaCase
                       NamedFieldPuns
+                      OverloadedLists
                       OverloadedStrings
                       PolyKinds
                       QuasiQuotes
@@ -99,10 +100,10 @@ Library
 Test-suite rbst-tests
   default-language:     Haskell2010
   type:                 exitcode-stdio-1.0
-  main-is:              Spec.hs
   hs-source-dirs:       test
-
-  other-modules:
+  main-is:              Spec.hs
+  other-modules:        Test.Common
+                         Test.RBST.QuerySpec
 
   build-depends:        rbst,
                         base              >=4.12     && <4.14,
@@ -148,6 +149,7 @@ Test-suite rbst-tests
                         KindSignatures
                         LambdaCase
                         NamedFieldPuns
+                        OverloadedLists
                         OverloadedStrings
                         PolyKinds
                         QuasiQuotes
