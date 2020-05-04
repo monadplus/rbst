@@ -64,11 +64,13 @@ import qualified System.Random.Mersenne.Pure64 as Random
 
 
 -- TODO
--- [ ] Duplicate Keys
+-- [ ] Implement union
+-- [ ] Change split implementation to remove duplicates
+-- [ ] Reimplement insert to handle duplicates
+-- [ ] Implement intersection,difference
 
 -- $setup
 -- >>> import RBST.Pretty
-
 
 -----------------------------------------
 -- Data Structure and Instances
@@ -233,7 +235,7 @@ insert k1 x RBST{..} =
       | k1 < k2    = first (recomputeSize . updateL node) (insert' gen' l)
       | otherwise  = first (recomputeSize . updateR node) (insert' gen' r)
       where
-        (guess, gen') = uniformR (0, coerce s+1) gen
+        (guess, gen') = uniformR (0, coerce s) gen
 {-# INLINEABLE insert #-}
 
 ----------------------------------------------
@@ -264,6 +266,9 @@ delete k1 RBST{..} =
 -- The 'union' returns a random BST.
 union :: RBST k a -> RBST k a -> RBST k a
 union = undefined
+
+
+
 
 -- | \( \theta(m + n) \). Intersection of two 'RBST'.
 --
@@ -303,10 +308,48 @@ uniformR (x1, x2)
 -- Core internal functions
 ----------------------------------------------
 
+-- | Return the left subtree or empty.
+getL :: Tree k a -> Tree k a
+getL Empty = Empty
+getL (Node _ _ l _ _) = l
+{-# INLINE getL #-}
+
+-- | Return the right subtree or empty.
+getR :: Tree k a -> Tree k a
+getR Empty = Empty
+getR (Node _ _ _ _ r) = r
+{-# INLINE getR #-}
+
+-- | 'fmap' over 'rbstGen'.
+overGen :: (Random.PureMT -> Random.PureMT) -> RBST k a -> RBST k a
+overGen f RBST{..} = RBST (f rbstGen) rbstTree
+{-# INLINE overGen #-}
+
+-- | Set a new 'rbstGen'.
+setGen :: Random.PureMT -> RBST k a -> RBST k a
+setGen newGen = overGen (const newGen)
+{-# INLINE setGen #-}
+
 -- | Lift a function from 'Tree' to 'RBST'.
 withTree :: (Tree k a -> r) -> (RBST k a -> r)
 withTree f = f . rbstTree
 {-# INLINE withTree #-}
+
+-- | Map the left subtree of a 'RBST'.
+mapL :: (Tree k a -> Tree k a) -> RBST k a -> RBST k a
+mapL f tree@(RBST _ Empty) = tree
+mapL f (RBST gen node@(Node _ _ l _ _)) =
+  let mappedTree = updateL node (f l)
+   in RBST gen mappedTree
+{-# INLINE mapL #-}
+
+-- | Map the right subtree of a 'RBST'.
+mapR :: (Tree k a -> Tree k a) -> RBST k a -> RBST k a
+mapR f tree@(RBST _ Empty) = tree
+mapR f (RBST gen node@(Node _ _ _ _ r)) =
+  let mappedTree = updateR node (f r)
+   in RBST gen mappedTree
+{-# INLINE mapR #-}
 
 -- | \( O(1) \). Recompute tree size after modification
 recomputeSize :: Tree k a -> Tree k a
@@ -400,17 +443,19 @@ updateR Empty newR            = newR
 updateR (Node s k l c _) newR = Node s k l c newR
 {-# INLINE updateR #-}
 
--- | \(O(\log \n )\). Insert node at root and rebalance the tree.
---
--- We call 'rotateR' and 'rotateL' to rebalance the tree after the new node is inserted.
+-- | \(O(\log \n )\). Insert node at root using 'split' and recompute the size.
 insertRoot :: Ord k => k -> a -> Tree k a -> Tree k a
 insertRoot k x Empty = oneTree k x
-insertRoot k x tree@(Node _ k2 l _ r)
-  | k < k2    = rotateR $ updateL tree (insertRoot k x l)
-  | otherwise = rotateL $ updateR tree (insertRoot k x r)
+insertRoot k x t =
+  let (l, r) = split k t
+   in recomputeSize $ node 0 k l x r
 {-# INLINE insertRoot #-}
 
 -- | \(O(\log \n )\. Split the tree \( T \) into two trees \( T_< \) and \( T_> \), which contain the keys of \( T \) that are smaller than x and larger than x, respectively.
+--
+-- TODO recompute size!!!
+-- TODO recompute size!!!
+-- TODO recompute size!!!
 split :: Ord k => k -> RBST k a -> (RBST k a, RBST k a)
 split k RBST{..} = fmap (RBST rbstGen) $ split' rbstTree
   where
@@ -423,6 +468,26 @@ split k RBST{..} = fmap (RBST rbstGen) $ split' rbstTree
           let (t1, t2) = split' r
            in (updateR node t1, t2)
 {-# INLINE split #-}
+
+-- | Given a BST where left and right subtrees are random BST, produce a completly random BST.
+--
+-- __NOTE__: the input can't be 'Empty'.
+pushDown :: RBST k a -> RBST k a
+pushDown (RBST _ Empty) = error "The input of pushDown can be an empty tree."
+pushDown rbst@(RBST gen tree@(Node s k l c r)) =
+  let !m = size l
+      !n = size r
+      !total = m + n
+      (!guess, gen') = uniformR (0, total)
+   in
+      if guess < m
+        then let tree' = RBST gen' (updateL tree (getR l))
+             in mapR (\_ -> pushDown . recomputeSize $ tree') l
+      else if guess < total
+        then let tree' = RBST gen' (updateR tree (getL r))
+             in mapL (\_ -> pushDown . recomputeSize $ tree') r
+      else
+        setGen gen' rbst
 
 -- | \(O(\log \ n )\). Invariant: : All keys from p must be strictly smaller than any key of q.
 --
