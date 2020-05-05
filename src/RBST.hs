@@ -84,8 +84,8 @@ module RBST (
 
   -- * Set operations
   , union
-  --, intersection
-  --, difference
+  , intersect
+  , difference
 
   -- * Reexports
   , module RBST

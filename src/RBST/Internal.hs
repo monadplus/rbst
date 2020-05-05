@@ -10,14 +10,18 @@
 --
 -- Efficient implementation of a /Randomized Binary Search Tree/.
 --
+-- The implementation uses the /Mersenne twister/, a pure pseudo-random number generator (Matsumoto and Nishimura).
+--
 -- __NOTE__: the computational complexity of each operation is annotated in the documentation and it is guaranteed, irrespectively of the input distribution (with a small constant factor overhead).
 --
 --------------------------------------------------------------------
 module RBST.Internal (
-  -- * Data structure & Instances
+  -- * Types, TyCons & Instances
     Size(..)
   , Tree(..)
   , RBST(..)
+  , MonadRandT
+  , MonadRand
 
   -- * Construction functions
   , defaultRandomGenerator
@@ -39,8 +43,8 @@ module RBST.Internal (
 
   -- * Set operations
   , union
-  --, intersection
-  --, difference
+  , intersect
+  , difference
 
   -- * Randomization functions
   , uniformR
@@ -52,22 +56,17 @@ module RBST.Internal (
   --, module System.Random.Mersenne.Pure64
   ) where
 
-import           Control.DeepSeq               (NFData (..), rnf)
-import           Data.Bifunctor                (first)
-import           Data.Coerce                   (coerce)
-import           Data.Foldable                 (foldl')
-import           Data.Word                     (Word64)
-import           GHC.Exts                      (IsList (..))
-import           GHC.Generics                  (Generic)
-import           Prelude                       hiding (lookup)
-import qualified System.Random.Mersenne.Pure64 as Random
-
-
--- TODO
--- [ ] Implement union
--- [ ] Change split implementation to remove duplicates
--- [ ] Reimplement insert to handle duplicates
--- [ ] Implement intersection,difference
+import           Control.DeepSeq                  (NFData (..), rnf)
+import           Control.Monad.Trans.State.Strict (StateT)
+import qualified Control.Monad.Trans.State.Strict as State
+import           Data.Coerce                      (coerce)
+import           Data.Foldable                    (foldl')
+import           Data.Functor.Identity            (Identity)
+import           Data.Word                        (Word64)
+import           GHC.Exts                         (IsList (..))
+import           GHC.Generics                     (Generic)
+import           Prelude                          hiding (lookup)
+import qualified System.Random.Mersenne.Pure64    as Random
 
 -- $setup
 -- >>> import RBST.Pretty
@@ -96,11 +95,11 @@ data RBST k a = RBST
   } deriving stock (Show, Generic, Foldable)
 
 -- | (<>) is implemented via 'merge'.
-instance Semigroup (RBST k a) where
+instance Ord k => Semigroup (RBST k a) where
     (<>) = union
 
 -- | mempty is implemented via 'empty'.
-instance Monoid (RBST k a) where
+instance Ord k => Monoid (RBST k a) where
     mempty = empty
 
 -- | (==) is implemented via (==) of the underlying 'Tree'.
@@ -131,27 +130,38 @@ instance Ord k => IsList (RBST k a) where
 
   -- | Inorder traversal.
   toList :: RBST k a -> [(k,a)]
-  toList RBST{..} = toListTree rbstTree where
-    toListTree Empty            = []
-    toListTree (Node _ k l x r) = toListTree l  ++ (k,x) : toListTree r
+  toList RBST{..} = toListTree rbstTree
+    where
+      toListTree Empty            = []
+      toListTree (Node _ k l x r) = toListTree l  ++ (k,x) : toListTree r
   {-# INLINEABLE toList #-}
 
 instance (NFData k, NFData a) => NFData (RBST k a) where
     rnf RBST{..} = rnf rbstTree `seq` ()
+
+-- | A random state transformer for the pseudo-random bits.
+type MonadRandT m a = StateT Random.PureMT m a
+
+-- | A random state in the 'Data.Functor.Identity' monad.
+type MonadRand a = StateT Random.PureMT Identity a
 
 ----------------------------------------
 -- Construction
 ----------------------------------------
 
 -- | A pure mersenne twister pseudo-random number generator, 'Random.PureMT',
+--
+-- __TODO__: may be a better idea to use Random.newPureMT.
 defaultRandomGenerator :: Random.PureMT
 defaultRandomGenerator = Random.pureMT 0
 {-# INLINE defaultRandomGenerator #-}
 
 -- | The empty 'Tree'.
 --
+-- @
 -- > empty         == fromList []
 -- > size empty == 0
+-- @
 empty :: RBST k a
 empty = emptyWithGen defaultRandomGenerator
 {-# INLINE empty #-}
@@ -202,8 +212,11 @@ sizeTreeInt (Node !s _ _ _ _) = fromIntegral (coerce s :: Word64)
 
 -- | \( O(\log \ n) \). Lookup the value at the key in the tree.
 --
--- >>> lookup 1 (empty :: Tree Int Int)
+-- >>> lookup 'A' (empty :: RBST Char Int)
 -- Nothing
+--
+-- >>> lookup 'A' (one 'A' 7)
+-- Just 7
 lookup :: Ord k => k -> RBST k a -> Maybe a
 lookup k1 = withTree lookup'
   where
@@ -223,19 +236,23 @@ lookup k1 = withTree lookup'
 -- If the key is already present in the map, the associated value is
 -- replaced with the supplied value.
 --
+-- @
 -- > insert 5 'x' empty == one 5 'x'
+-- @
 insert :: Ord k => k -> a -> RBST k a -> RBST k a
-insert k1 x RBST{..} =
-  let (tree, gen) = insert' rbstGen rbstTree
-  in RBST gen tree
+insert k x RBST{..} = runRand (insert' rbstTree) rbstGen
   where
-    insert' gen Empty = (oneTree k1 x, gen)
-    insert' gen node@(Node s !k2 l _ r)
-      | guess == 0 = (insertRoot k1 x node, gen')
-      | k1 < k2    = first (recomputeSize . updateL node) (insert' gen' l)
-      | otherwise  = first (recomputeSize . updateR node) (insert' gen' r)
-      where
-        (guess, gen') = uniformR (0, coerce s) gen
+    insert' Empty = return (oneTree k x)
+    insert' node@(Node s !k2 l _ r) = do
+      guess <- uniformR (0, coerce s)
+      if guess == 0
+        then do (rep, tree) <- insertRoot k x node
+                if rep then pushDown tree
+                       else pure tree
+      else if k < k2
+        then recomputeSize . updateL node <$> insert' l
+      else
+        recomputeSize . updateR node <$> insert' r
 {-# INLINEABLE insert #-}
 
 ----------------------------------------------
@@ -244,16 +261,16 @@ insert k1 x RBST{..} =
 
 -- | \( O(\log \ n) \). Delete a key and its value from the map. When the key is not a member of the map, the original map is returned.
 --
+-- @
 -- > delete 1 (one (1, "A")) == empty
+-- @
 delete :: Ord k => k -> RBST k a -> RBST k a
-delete k1 RBST{..} =
-  let (tree, gen) = delete' rbstTree
-  in RBST gen tree
+delete k RBST{..} = runRand (delete' rbstTree) rbstGen
   where
-    delete' Empty = (Empty, rbstGen)
+    delete' Empty = return Empty
     delete' (Node _ k2 l _ r)
-      | k1 == k2  = join rbstGen l r
-      | k1 < k2   = delete' l
+      | k == k2   = join l r
+      | k < k2    = delete' l
       | otherwise = delete' r
 {-# INLINEABLE delete #-}
 
@@ -261,35 +278,68 @@ delete k1 RBST{..} =
 -- Set operations
 ----------------------------------------------
 
--- | \( \theta(m + n) \). Union of two 'RBST' deleting duplicate keys.
+-- | \( \theta(m + n) \). Union of two 'RBST'.
 --
--- The 'union' returns a random BST.
-union :: RBST k a -> RBST k a -> RBST k a
-union = undefined
-
-
+-- In case of duplication, only one key remains by a random choice.
+union :: Ord k => RBST k a -> RBST k a -> RBST k a
+union (RBST s tree1) (RBST _ tree2) = runRand (union' tree1 tree2) s
+  where
+  union' t1 t2 = do
+    let m = fromIntegral $ sizeTreeInt t1
+        n = fromIntegral $ sizeTreeInt t2
+        total = m + n
+    if total == 0
+      then return Empty
+    else do
+      u <- uniformR (1, total)
+      let (a,b) = if u <= m then (t1,t2) else (t2,t1)
+          (Node _ aKey aL x aR) = a -- Ignore warning: checked at u <= m
+      (rep, bL, bR) <- split aKey b
+      l <- union' aL bL
+      r <- union' aR bR
+      let randomize = if rep then pushDown else pure
+      randomize (recomputeSize (Node 0 aKey l x r))
+{-# INLINEABLE union #-}
 
 
 -- | \( \theta(m + n) \). Intersection of two 'RBST'.
 --
 -- Notice, the intersection do not require randomness to produce a /Random Binary Search Tree/.
-intersect :: RBST k a -> RBST k a -> RBST k a
-intersect = error "Not implemented yet!"
+intersect :: Ord k => RBST k a -> RBST k a -> RBST k a
+intersect (RBST s t1) (RBST _ t2) = runRand (intersect' t1 t2) s
+  where
+  intersect' Empty _ = return Empty
+  intersect' (Node _ k l x r) b = do
+    (rep, bL, bR) <- split k b
+    iL <- intersect' l bL
+    iR <- intersect' r bR
+    if rep then pure $ recomputeSize (Node 0 k iL x iR)
+           else join iL iR
+{-# INLINEABLE intersect #-}
 
 -- | \( \theta(m + n) \). Difference of two 'RBST'.
 --
 -- Notice, the difference do not require randomness to produce a /Random Binary Search Tree/.
-difference :: RBST k a -> RBST k a -> RBST k a
-difference = error "Not implemented yet!"
+difference :: Ord k => RBST k a -> RBST k a -> RBST k a
+difference (RBST s t1) (RBST _ t2) = runRand (difference' t1 t2) s
+  where
+  difference' Empty _ = return Empty
+  difference' (Node _ k l x r) b = do
+    (rep, bL, bR) <- split k b
+    dL <- difference' l bL
+    dR <- difference' r bR
+    if rep then join dL dR
+           else pure $ recomputeSize (Node 0 k dL x dR)
+{-# INLINEABLE difference #-}
 
 ----------------------------------------------
 -- Random
 ----------------------------------------------
 
 -- | Return a uniformly random 'Word64' in the given range.
-uniformR :: (Word64, Word64) -> Random.PureMT -> (Word64, Random.PureMT)
+uniformR :: (Word64, Word64) -> MonadRand Word64
 uniformR (x1, x2)
-  | n == 0    = const (error "Check uniformR")
+  | n == 0    = error "Check uniformR"
   | otherwise = loop
   where
     (# i,j #) | x1 < x2   = (# x1, x2 #)
@@ -297,66 +347,65 @@ uniformR (x1, x2)
     n = 1 + (j - i)
     buckets = maxBound `div` n
     maxN = buckets * n -- rounding
-    loop g =
-      let (!x, g') = Random.randomWord64 g
-       in if x < maxN
-            then (i + (x `div` buckets), g')
-            else loop g'
+    loop = do
+      gen <- State.get
+      let (!x, nextGen) = Random.randomWord64 gen
+      if x < maxN
+        then State.put nextGen >> return (i + (x `div` buckets))
+        else State.put nextGen >> loop
 {-# INLINE uniformR #-}
 
 ----------------------------------------------
 -- Core internal functions
 ----------------------------------------------
 
+-- | Given a random computation 'Tree' and an initial state, returns a 'RBST'.
+runRand :: MonadRand (Tree k a) -> Random.PureMT -> RBST k a
+runRand r s = let (tree, s') = State.runState r s in RBST s' tree
+
+-- | Returns the key of the 'Node' or 'Nothing'.
+-- getKey :: Tree k a -> Maybe k
+-- getKey Empty = Nothing
+-- getKey (Node _ k _ _ _) = Just k
+-- {-# INLINE getKey #-}
+
 -- | Return the left subtree or empty.
 getL :: Tree k a -> Tree k a
-getL Empty = Empty
+getL Empty            = Empty
 getL (Node _ _ l _ _) = l
 {-# INLINE getL #-}
 
 -- | Return the right subtree or empty.
 getR :: Tree k a -> Tree k a
-getR Empty = Empty
+getR Empty            = Empty
 getR (Node _ _ _ _ r) = r
 {-# INLINE getR #-}
 
 -- | 'fmap' over 'rbstGen'.
-overGen :: (Random.PureMT -> Random.PureMT) -> RBST k a -> RBST k a
-overGen f RBST{..} = RBST (f rbstGen) rbstTree
-{-# INLINE overGen #-}
+-- overGen :: (Random.PureMT -> Random.PureMT) -> RBST k a -> RBST k a
+-- overGen f RBST{..} = RBST (f rbstGen) rbstTree
+-- {-# INLINE overGen #-}
 
 -- | Set a new 'rbstGen'.
-setGen :: Random.PureMT -> RBST k a -> RBST k a
-setGen newGen = overGen (const newGen)
-{-# INLINE setGen #-}
+-- setGen :: Random.PureMT -> RBST k a -> RBST k a
+-- setGen newGen = overGen (const newGen)
+-- {-# INLINE setGen #-}
 
 -- | Lift a function from 'Tree' to 'RBST'.
 withTree :: (Tree k a -> r) -> (RBST k a -> r)
 withTree f = f . rbstTree
 {-# INLINE withTree #-}
 
--- | Map the left subtree of a 'RBST'.
-mapL :: (Tree k a -> Tree k a) -> RBST k a -> RBST k a
-mapL f tree@(RBST _ Empty) = tree
-mapL f (RBST gen node@(Node _ _ l _ _)) =
-  let mappedTree = updateL node (f l)
-   in RBST gen mappedTree
-{-# INLINE mapL #-}
-
--- | Map the right subtree of a 'RBST'.
-mapR :: (Tree k a -> Tree k a) -> RBST k a -> RBST k a
-mapR f tree@(RBST _ Empty) = tree
-mapR f (RBST gen node@(Node _ _ _ _ r)) =
-  let mappedTree = updateR node (f r)
-   in RBST gen mappedTree
-{-# INLINE mapR #-}
+-- overTree :: (Tree k a -> Tree k a) -> (RBST k a -> RBST k a)
+-- overTree f RBST{..} = RBST rbstGen (f rbstTree)
+-- {-# INLINE overTree #-}
 
 -- | \( O(1) \). Recompute tree size after modification
 recomputeSize :: Tree k a -> Tree k a
 recomputeSize Empty            = Empty
 recomputeSize (Node _ k l c r) =
   let !s = sizeTree l + sizeTree r + 1 in Node s k l c r
-{-# INLINEABLE recomputeSize #-}
+{-# INLINE recomputeSize #-}
 
 -- | \( O(1) \). Rotate tree to the left.
 --
@@ -382,14 +431,14 @@ recomputeSize (Node _ k l c r) =
 --         ╱    ╲
 --        B      C
 --
-rotateR :: Tree k a -> Tree k a
-rotateR Empty = Empty
-rotateR node@(Node _ _ Empty _ _) = node
-rotateR (Node s k (Node _ k2 l2 c2 r2) c r) =
-  Node s k2 l2 c2 newR
-  where
-    newR = recomputeSize $ Node s k r2 c r
-{-# INLINEABLE rotateR #-}
+-- rotateR :: Tree k a -> Tree k a
+-- rotateR Empty = Empty
+-- rotateR node@(Node _ _ Empty _ _) = node
+-- rotateR (Node s k (Node _ k2 l2 c2 r2) c r) =
+--   Node s k2 l2 c2 newR
+--   where
+--     newR = recomputeSize $ Node s k r2 c r
+-- {-# INLINEABLE rotateR #-}
 
 -- | \( O(1) \). Rotate tree to the left.
 --
@@ -416,14 +465,14 @@ rotateR (Node s k (Node _ k2 l2 c2 r2) c r) =
 --  ╱    ╲
 -- A      B
 --
-rotateL :: Tree k a -> Tree k a
-rotateL Empty = Empty
-rotateL node@(Node _ _ _ _ Empty) = node
-rotateL (Node s k l c (Node _ k2 l2 c2 r2)) =
-  Node s k2 newL c2 r2
-  where
-    newL = recomputeSize $ Node s k l c l2
-{-# INLINE rotateL #-}
+-- rotateL :: Tree k a -> Tree k a
+-- rotateL Empty = Empty
+-- rotateL node@(Node _ _ _ _ Empty) = node
+-- rotateL (Node s k l c (Node _ k2 l2 c2 r2)) =
+--   Node s k2 newL c2 r2
+--   where
+--     newL = recomputeSize $ Node s k l c l2
+-- {-# INLINE rotateL #-}
 
 -- | \( O(1) \). Update the left node with the given subtree.
 --
@@ -444,61 +493,59 @@ updateR (Node s k l c _) newR = Node s k l c newR
 {-# INLINE updateR #-}
 
 -- | \(O(\log \n )\). Insert node at root using 'split' and recompute the size.
-insertRoot :: Ord k => k -> a -> Tree k a -> Tree k a
-insertRoot k x Empty = oneTree k x
-insertRoot k x t =
-  let (l, r) = split k t
-   in recomputeSize $ node 0 k l x r
+--
+-- __NOTE__: duplicated keys are removed by randomly picking one of them.
+insertRoot :: Ord k => k -> a -> Tree k a -> MonadRand (Bool, Tree k a)
+insertRoot k x Empty = return (False, oneTree k x)
+insertRoot k x tree = do
+  (rep, l, r) <- split k tree
+  return (rep, recomputeSize (Node 0 k l x r))
 {-# INLINE insertRoot #-}
 
 -- | \(O(\log \n )\. Split the tree \( T \) into two trees \( T_< \) and \( T_> \), which contain the keys of \( T \) that are smaller than x and larger than x, respectively.
 --
--- TODO recompute size!!!
--- TODO recompute size!!!
--- TODO recompute size!!!
-split :: Ord k => k -> RBST k a -> (RBST k a, RBST k a)
-split k RBST{..} = fmap (RBST rbstGen) $ split' rbstTree
-  where
-    split' Empty = (Empty, Empty)
-    split' node@(_ k2 l _ r)
-      | k < k2    =
-          let (t1, t2) = split' l
-           in (t1, updateL node t2)
-      | otherwise =
-          let (t1, t2) = split' r
-           in (updateR node t1, t2)
+-- This is a sligh variant which removes any duplicate of 'k' and returns a bool indicating so.
+split :: Ord k => k -> Tree k a -> MonadRand (Bool, Tree k a, Tree k a)
+split _ Empty = return (False, Empty, Empty)
+split k node@(Node _ k2 l _ r)
+  | k < k2 = do
+    (b, t1, t2) <- split k l
+    return (b, t1, recomputeSize (updateL node t2))
+  | k == k2 = do
+      (_, t1, t2) <- split k r
+      newT1       <- join l t1
+      return (True, newT1, t2)
+  | otherwise = do
+      (b, t1, t2) <- split k r
+      return (b, recomputeSize (updateR node t1), t2)
 {-# INLINE split #-}
 
--- | Given a BST where left and right subtrees are random BST, produce a completly random BST.
+-- | Given a BST where left and right subtrees are random BST, returns a completly random BST.
 --
 -- __NOTE__: the input can't be 'Empty'.
-pushDown :: RBST k a -> RBST k a
-pushDown (RBST _ Empty) = error "The input of pushDown can be an empty tree."
-pushDown rbst@(RBST gen tree@(Node s k l c r)) =
-  let !m = size l
-      !n = size r
+pushDown :: Tree k a -> MonadRand (Tree k a)
+pushDown Empty = error "The input of pushDown can be an empty tree."
+pushDown tree@(Node _ _ l _ r) = do
+  let !m = fromIntegral $ sizeTreeInt l
+      !n = fromIntegral $ sizeTreeInt r
       !total = m + n
-      (!guess, gen') = uniformR (0, total)
-   in
-      if guess < m
-        then let tree' = RBST gen' (updateL tree (getR l))
-             in mapR (\_ -> pushDown . recomputeSize $ tree') l
-      else if guess < total
-        then let tree' = RBST gen' (updateR tree (getL r))
-             in mapL (\_ -> pushDown . recomputeSize $ tree') r
-      else
-        setGen gen' rbst
+  u <- uniformR (0, total)
+  if u < m
+    then updateR l <$> (pushDown $ recomputeSize $ updateL tree (getR l))
+  else if u < total
+    then updateL r <$> (pushDown $ recomputeSize $ updateR tree (getL r))
+  else
+    return tree
 
 -- | \(O(\log \ n )\). Invariant: : All keys from p must be strictly smaller than any key of q.
 --
 -- Theorem. The join of two independent random binary search tree is a random binary search tree.
-join :: Random.PureMT -> Tree k a -> Tree k a -> (Tree k a, Random.PureMT)
-join gen Empty q = (q, gen)
-join gen p Empty = (p, gen)
-join gen p@(Node s _ _ _ r) q@(Node s2 _ l2 _ _)
-  | coerce guess < s = first (recomputeSize . updateR p) (join gen' r q)
-  | otherwise        = first (recomputeSize . updateL q) (join gen' p l2)
-  where
-    maxN = unSize (s + s2)
-    (guess, gen') = uniformR (0, maxN) gen
+join :: Tree k a -> Tree k a -> MonadRand (Tree k a)
+join Empty q = return q
+join p Empty = return p
+join p@(Node s _ _ _ pR) q@(Node s2 _ qL _ _) = do
+  guess <- uniformR (0, unSize (s + s2))
+  if guess < unSize s
+    then recomputeSize . updateR p <$> join pR q
+    else recomputeSize . updateL q <$> join p  qL
 {-# INLINE join #-}

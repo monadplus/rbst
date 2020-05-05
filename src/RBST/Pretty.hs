@@ -20,7 +20,7 @@ module RBST.Pretty (
   , prettyPrint
   ) where
 
-import           RBST.Internal (Tree(..), RBST(..), withTree)
+import           RBST.Internal (Tree(..), RBST(..), Size(..), withTree)
 import           Data.Coerce (Coercible, coerce)
 
 -- | 2-dimensional ASCII drawing of a 'Tree'.
@@ -62,13 +62,13 @@ prettyPrint = putStrLn . pretty @k @i @a @b
 draw :: forall k i a b. (Coercible k i, Show i, Coercible a b, Show b)
        => Tree k a -> [String]
 draw Empty = []
-draw (Node _ k l x r) = [drawNode] ++ drawSubTrees
+draw (Node s k l x r) = [drawNode] ++ drawSubTrees
   where
-    drawNode = show (coerce @k @i k) ++ ":" ++ show (coerce @a @b x)
+    drawNode = show (coerce @k @i k) ++ " → " ++ show (coerce @a @b x) ++ " (" ++ (show (unSize s)) ++ ")"
 
     drawSubTrees =
-      let drawR = "|" : shift "+- " "|  " (draw @k @i @a @b r)
-          drawL = "|" : shift "`- " "   " (draw @k @i @a @b l)
+      let drawR = "|" : shift "+-- " "|  " (draw @k @i @a @b r)
+          drawL = "|" : shift "`-- " "   " (draw @k @i @a @b l)
       in  drawR ++ drawL
 
     shift first other = zipWith (++) (first : repeat other)

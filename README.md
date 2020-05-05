@@ -1,4 +1,4 @@
-## Randomized Binary Search Trees (RBSTs)
+## rbst
 
 ![RBST nodes](./images/rbst.png)
 [![Build Status](https://travis-ci.org/monadplus/RBST.svg?branch=master)](https://travis-ci.org/monadplus/RBST)
