@@ -9,7 +9,7 @@
 --
 -- == General description
 --
--- Package @rbst@ implements a self-balancing-tree-like data structure called /Randomized Binary Search Tree/. This data structure behave exactly like a <https://en.wikipedia.org/wiki/Random_binary_tree random_binary_search_tree>, irrespectively of the input data distribution, with fast (logarithmic time complexity) @'RBST.insert'@ \/ @'RBST.delete'@ \/ @'lookup'@ \/ @'union'@ operations.
+-- Package @rbst@ implements a self-balancing-tree-like data structure called /Randomized Binary Search Tree/. This data structure behave exactly like a <https://en.wikipedia.org/wiki/Random_binary_tree random_binary_search_tree>, irrespectively of the input data distribution, with fast (logarithmic time complexity) @'RBST.insert'@ \/ @'RBST.delete'@ \/ @'lookup'@ \/ @'union'@ \/ etc. operations.
 --
 -- == Package structure
 --
@@ -19,40 +19,49 @@
 --
 -- Module __"RBST"__ reexports ony __"RBST.Pretty"__ and exports all 'RBST' functionalities.
 --
--- == Usage
+-- == Usage example
 --
--- A balanced 'Tree' can be created the following ways:
+-- A balanced 'Tree' can be created from a list of keys/values:
 --
--- @
--- > import qualified RBST
--- > let empty = RBST.empty :: RBST Int String
--- > let single = RBST.one 1 'v'
--- > let tree = RBST.fromList [("x", 2),("y", 3), ("z", 1)]
--- > RBST.prettyPrint tree
+-- >>> import GHC.Exts (IsList (..))
+-- >>> let empty = empty :: RBST Int String
+-- >>> let single = one 1 'v'
+-- >>> let tree = fromList [("x", 2),("y", 3), ("z", 1)] :: RBST String Int
+-- >>> prettyPrint tree
+--       ("y",3) [3]
+--            ╱╲
+--           ╱  ╲
+--          ╱    ╲
+--         ╱      ╲
+--        ╱        ╲
+--       ╱          ╲
+-- ("x",2) [1] ("z",1) [1]
 --
---         ╱╲
---        ╱  ╲
---       ╱    ╲
---      ╱      ╲
---     ╱╲      Z:1
---    ╱  ╲
---   ╱    ╲
--- X:2     Y:3
--- @
+-- Each node shows:
 --
--- Then, you can update/query it:
+-- 1. The key.
+-- 2. The associated value.
+-- 3. The size of the tree.
 --
--- @
--- > insert "w" 5 tree
+-- You can try it:
 --
--- > delete "u" tree
+-- >>> insert "w" 5 tree
 --
--- > lookup "y" tree
+-- >>> delete "u" tree
+--
+-- >>> lookup "y" tree
 -- Just 3
 --
--- > lookup "w" tree
+-- >>> lookup "w" tree
 -- Nothing
--- @
+--
+-- >>> compactPrint tree
+-- ("y",3) [3]
+--      |
+--      |-- ("z",1) [1]
+--      |
+--      \__ ("x",2) [1]
+--
 --
 -- == Implementation
 --
@@ -74,17 +83,21 @@ module RBST (
 
   -- * Query functions
   , size
+  , height
   , lookup
+  , at
 
   -- * Modification functions
-  -- ** Insertion
   , insert
-  -- ** Deletion
   , delete
+  , remove
+  , take
+  , drop
 
   -- * Set operations
   , union
-  , intersect
+  , intersection
+  , subtraction
   , difference
 
   -- * Reexports
@@ -92,6 +105,6 @@ module RBST (
 
   ) where
 
-import           Prelude       hiding (lookup)
+import           Prelude       hiding (drop, lookup, take)
 import           RBST.Internal as Internal
 import           RBST.Pretty   as RBST

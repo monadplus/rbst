@@ -1,4 +1,3 @@
-{-# LANGUAGE UnboxedTuples #-}
 --------------------------------------------------------------------
 -- |
 -- Module      :  RBST.Internal
@@ -16,7 +15,7 @@
 --
 --------------------------------------------------------------------
 module RBST.Internal (
-  -- * Types, TyCons & Instances
+  -- * Types, Constructors & Instances
     Size(..)
   , Tree(..)
   , RBST(..)
@@ -24,26 +23,32 @@ module RBST.Internal (
   , MonadRand
 
   -- * Construction functions
-  , defaultRandomGenerator
   , empty
   , emptyWithGen
   , one
   , oneWithGen
+    -- ** Random Generators
+    , defaultRandomGenerator
+    , clockRandomGenerator
 
   -- * Query functions
   , size
   , sizeTree
+  , height
   , lookup
+  , at
 
   -- * Modification functions
-  -- ** Insertion
   , insert
-  -- ** Deletion
   , delete
+  , remove
+  , take
+  , drop
 
   -- * Set operations
   , union
-  , intersect
+  , intersection
+  , subtraction
   , difference
 
   -- * Randomization functions
@@ -52,8 +57,6 @@ module RBST.Internal (
   -- * Internals functions
   , withTree
 
-  -- * Reexports
-  --, module System.Random.Mersenne.Pure64
   ) where
 
 import           Control.DeepSeq                  (NFData (..), rnf)
@@ -65,17 +68,18 @@ import           Data.Functor.Identity            (Identity)
 import           Data.Word                        (Word64)
 import           GHC.Exts                         (IsList (..))
 import           GHC.Generics                     (Generic)
-import           Prelude                          hiding (lookup)
+import           Prelude                          hiding (drop, lookup, take)
 import qualified System.Random.Mersenne.Pure64    as Random
 
 -- $setup
--- >>> import RBST.Pretty
+-- >>> import qualified RBST.Pretty as Pretty
+-- >>> import GHC.Exts
 
 -----------------------------------------
 -- Data Structure and Instances
 -----------------------------------------
 
--- | Size of the 'Tree' data structure. Guaranteed to be always > 0.
+-- | Size of the 'Tree' data structure.
 newtype Size = Size
   { unSize :: Word64
   } deriving stock (Show, Read, Generic)
@@ -115,11 +119,30 @@ instance (Eq k, Eq a) => Eq (RBST k a) where
 -- 1. 'fromList': \( O(n \cdot \log \ n) \)
 -- 2. 'toList': \( O(n) \).
 --
--- @
--- > let tree = fromList @(RBST String Int) [("duck",5), ("lion",3), ("ape",1)]
+-- >>> import GHC.Exts
+-- >>> let tree = (fromList $ zip ['a'..'e'] [1..5]) :: RBST Char Int
+-- >>> Pretty.prettyPrint tree
+--                ('d',4) [5]
+--                        ╱╲
+--                       ╱  ╲
+--                      ╱    ╲
+--                     ╱      ╲
+--                    ╱        ╲
+--                   ╱          ╲
+--                  ╱            ╲
+--                 ╱              ╲
+--                ╱                ╲
+--       ('b',2) [3]       ('e',5) [1]
+--            ╱╲
+--           ╱  ╲
+--          ╱    ╲
+--         ╱      ╲
+--        ╱        ╲
+--       ╱          ╲
+-- ('a',1) [1] ('c',3) [1]
 --
--- > toList smallRBST == [('A',1),('B',2),('C',3),('D',4),('E',5)]
--- @
+-- >>> toList tree
+-- [('a',1),('b',2),('c',3),('d',4),('e',5)]
 instance Ord k => IsList (RBST k a) where
   type Item (RBST k a) = (k,a)
 
@@ -135,6 +158,7 @@ instance Ord k => IsList (RBST k a) where
       toListTree Empty            = []
       toListTree (Node _ k l x r) = toListTree l  ++ (k,x) : toListTree r
   {-# INLINEABLE toList #-}
+-- Note, a pure fromList could be created using a triplet including a random number.
 
 instance (NFData k, NFData a) => NFData (RBST k a) where
     rnf RBST{..} = rnf rbstTree `seq` ()
@@ -149,17 +173,24 @@ type MonadRand a = StateT Random.PureMT Identity a
 -- Construction
 ----------------------------------------
 
--- | A pure mersenne twister pseudo-random number generator, 'Random.PureMT',
+-- | A pure mersenne twister pseudo-random number generator.
 --
--- __TODO__: may be a better idea to use Random.newPureMT.
+-- It is created using a __fixed__ seed.
 defaultRandomGenerator :: Random.PureMT
 defaultRandomGenerator = Random.pureMT 0
 {-# INLINE defaultRandomGenerator #-}
 
+-- | A pure mersenne twister pseudo-random number generator.
+--
+-- It is created using a pseudo-random seed from the internal clock.
+clockRandomGenerator :: IO Random.PureMT
+clockRandomGenerator = Random.newPureMT
+{-# INLINE clockRandomGenerator #-}
+
 -- | The empty 'Tree'.
 --
 -- @
--- > empty         == fromList []
+-- > empty      == fromList []
 -- > size empty == 0
 -- @
 empty :: RBST k a
@@ -210,6 +241,24 @@ sizeTreeInt Empty             = 0
 sizeTreeInt (Node !s _ _ _ _) = fromIntegral (coerce s :: Word64)
 {-# INLINE sizeTreeInt #-}
 
+-- | \( O(n) \). Height of the tree.
+--
+-- >>> height (empty :: RBST Char Int)
+-- -1
+--
+-- >>> height (one 'x' 1)
+-- 1
+--
+-- >>> height (one 'x' 1 <> one 'y' 2)
+-- 2
+height :: RBST k a -> Int
+height = withTree height'
+  where
+    height' :: Tree k a -> Int
+    height'            Empty = -1
+    height' (Node _ _ l _ r) = 1 + max (height' l) (height' r)
+{-# INLINEABLE height #-}
+
 -- | \( O(\log \ n) \). Lookup the value at the key in the tree.
 --
 -- >>> lookup 'A' (empty :: RBST Char Int)
@@ -237,23 +286,31 @@ lookup k1 = withTree lookup'
 -- replaced with the supplied value.
 --
 -- @
--- > insert 5 'x' empty == one 5 'x'
+-- > insert 'x' 1 empty == one 'x' 1
+--
+-- -- Notice, this is not equivalent due to randomness.
+-- > insert 'x' 1 tree /= insert 'x' 1 (insert 'x' 1 tree)
 -- @
+--
+-- >>> insert 'c' 4 (zip [] :: )
 insert :: Ord k => k -> a -> RBST k a -> RBST k a
-insert k x RBST{..} = runRand (insert' rbstTree) rbstGen
-  where
-    insert' Empty = return (oneTree k x)
-    insert' node@(Node s !k2 l _ r) = do
-      guess <- uniformR (0, coerce s)
-      if guess == 0
-        then do (rep, tree) <- insertRoot k x node
-                if rep then pushDown tree
-                       else pure tree
-      else if k < k2
-        then recomputeSize . updateL node <$> insert' l
-      else
-        recomputeSize . updateR node <$> insert' r
+insert k x RBST{..} = runRand (insert' k x rbstTree) rbstGen
 {-# INLINEABLE insert #-}
+
+-- | 'insert' for 'Tree'\'s in the 'MonadRand'.
+insert' :: Ord k => k -> a -> Tree k a -> MonadRand (Tree k a)
+insert' k x Empty = return (oneTree k x)
+insert' k x node@(Node s !k2 l _ r) = do
+  guess <- uniformR (0, coerce s)
+  if guess == 0
+    then do (rep, tree) <- insertRoot k x node
+            if rep then pushDown tree
+                   else pure tree
+  else if k < k2
+    then recomputeSize . updateL node <$> insert' k x l
+  else
+    recomputeSize . updateR node <$> insert' k x r
+{-# INLINEABLE insert' #-}
 
 ----------------------------------------------
 -- Deletion
@@ -265,14 +322,103 @@ insert k x RBST{..} = runRand (insert' rbstTree) rbstGen
 -- > delete 1 (one (1, "A")) == empty
 -- @
 delete :: Ord k => k -> RBST k a -> RBST k a
-delete k RBST{..} = runRand (delete' rbstTree) rbstGen
-  where
-    delete' Empty = return Empty
-    delete' (Node _ k2 l _ r)
-      | k == k2   = join l r
-      | k < k2    = delete' l
-      | otherwise = delete' r
+delete k RBST{..} = runRand (delete' k rbstTree) rbstGen
 {-# INLINEABLE delete #-}
+
+-- | 'delete' for 'Tree'\'s in the 'MonadRand'.
+delete' :: Ord k => k -> Tree k a -> MonadRand (Tree k a)
+delete' _ Empty = return Empty
+delete' k (Node _ k2 l _ r)
+  | k == k2   = join l r
+  | k < k2    = delete' k l
+  | otherwise = delete' k r
+{-# INLINEABLE delete' #-}
+
+----------------------------------------
+-- Query by Rank
+----------------------------------------
+
+-- | \( O(\log \ n) \). Get the i-th element of the tree.
+--
+-- __NOTE__: \(0 \leq i \leq n\), where /n/ is the size of the tree.
+--
+-- >>> let tree = fromList [('a',1), ('b', 2), ('c',3)] :: RBST Char Int
+-- >>> lookupByRank 0 tree
+-- Just ('a', 1)
+-- >>> lookupByRank 2 tree
+-- Just ('c', 3)
+at :: Int -> RBST k a -> Maybe (k, a)
+at ith = withTree (at' ith)
+  where
+    at' _ Empty = Nothing
+    at' i (Node _ k l x r)
+      | i < sizeL  = at' i l
+      | i == sizeL = Just (k, x)
+      | otherwise  = at' (i - (sizeL + 1)) r
+      where sizeL = sizeTreeInt l
+{-# INLINEABLE at #-}
+
+-- | \( O(\log \ n) \). Delete the i-th element of the tree.
+--
+-- __NOTE__: \(0 \leq i \leq n\), where /n/ is the size of the tree.
+--
+-- >>> let tree = fromList [('a',1), ('b', 2), ('c',3)] :: RBST Char Int
+-- >>> toList $ deleteByRank 0 tree
+-- [('b', 2), ('c',3)]
+remove :: Int -> RBST k a -> RBST k a
+remove ith RBST{..} = runRand (deleteByRank' ith rbstTree) rbstGen
+  where
+    deleteByRank' _ Empty = return Empty
+    deleteByRank' i (Node _ _ l _ r)
+      | i < sizeL  = deleteByRank' i l
+      | i == sizeL = join l r
+      | otherwise  = deleteByRank' (i - (sizeL + 1)) r
+      where sizeL = sizeTreeInt l
+{-# INLINEABLE remove #-}
+
+-- | \( O(\log n) \). Returns the first @i@-th elements of the given tree @t@ of size @n@.
+--
+-- __Note__:
+--
+-- 1. If \( i \leq 0 \), then the result is 'empty'.
+-- 2. If \( i \geq n \), then the result is @t@.
+take :: Int -> RBST k a -> RBST k a
+take n rbst@RBST{..}
+  | n <= 0         = rbst
+  | n >= size rbst = RBST rbstGen Empty
+  | otherwise      = runRand (go n rbstTree) rbstGen
+  where
+    go _ Empty = return Empty
+    go 0 t     = return t
+    go i node@(Node _ _ l _ r)
+      | i < sizeL  = go i l
+      | i == sizeL = return l
+      | otherwise  = do
+          newR <- go (i - (sizeL + 1)) r
+          return $ recomputeSize $ updateR node newR
+      where sizeL = sizeTreeInt l
+{-# INLINEABLE take #-}
+
+-- | \( O(\log n) \). Returns the tree @t@ without the first @i@-th elements.
+--
+-- __Note__:
+--
+-- 1. If \( i \leq 0 \), then the result is @t@.
+-- 2. If \( i \geq n \), then the result is 'empty'.
+drop :: Ord k => Int -> RBST k a -> RBST k a
+drop n rbst@RBST{..}
+  | n <= 0         = rbst
+  | n >= size rbst = RBST rbstGen Empty
+  | otherwise      = runRand (go n rbstTree) rbstGen
+  where
+    go _ Empty = return Empty
+    go 0 t     = return t
+    go i (Node _ k l x r)
+      | i < sizeL  = go i l
+      | i == sizeL = insert' k x r
+      | otherwise  = go (i - (sizeL + 1)) r
+      where sizeL = sizeTreeInt l
+{-# INLINEABLE drop #-}
 
 ----------------------------------------------
 -- Set operations
@@ -303,10 +449,8 @@ union (RBST s tree1) (RBST _ tree2) = runRand (union' tree1 tree2) s
 
 
 -- | \( \theta(m + n) \). Intersection of two 'RBST'.
---
--- Notice, the intersection do not require randomness to produce a /Random Binary Search Tree/.
-intersect :: Ord k => RBST k a -> RBST k a -> RBST k a
-intersect (RBST s t1) (RBST _ t2) = runRand (intersect' t1 t2) s
+intersection :: Ord k => RBST k a -> RBST k a -> RBST k a
+intersection (RBST s t1) (RBST _ t2) = runRand (intersect' t1 t2) s
   where
   intersect' Empty _ = return Empty
   intersect' (Node _ k l x r) b = do
@@ -315,22 +459,34 @@ intersect (RBST s t1) (RBST _ t2) = runRand (intersect' t1 t2) s
     iR <- intersect' r bR
     if rep then pure $ recomputeSize (Node 0 k iL x iR)
            else join iL iR
-{-# INLINEABLE intersect #-}
+{-# INLINEABLE intersection #-}
 
--- | \( \theta(m + n) \). Difference of two 'RBST'.
---
--- Notice, the difference do not require randomness to produce a /Random Binary Search Tree/.
-difference :: Ord k => RBST k a -> RBST k a -> RBST k a
-difference (RBST s t1) (RBST _ t2) = runRand (difference' t1 t2) s
+-- | \( \theta(m + n) \). Difference (subtraction) of two 'RBST'.
+subtraction :: Ord k => RBST k a -> RBST k a -> RBST k a
+subtraction (RBST s t1) (RBST _ t2) = runRand (subtraction' t1 t2) s
   where
-  difference' Empty _ = return Empty
-  difference' (Node _ k l x r) b = do
+  subtraction' Empty _ = return Empty
+  subtraction' (Node _ k l x r) b = do
     (rep, bL, bR) <- split k b
-    dL <- difference' l bL
-    dR <- difference' r bR
+    dL <- subtraction' l bL
+    dR <- subtraction' r bR
+    if rep then join dL dR
+           else pure $ recomputeSize (Node 0 k dL x dR)
+{-# INLINEABLE subtraction #-}
+
+-- | \( \theta(m + n) \). Difference (disjunctive union) of two 'RBST'.
+difference :: Ord k => RBST k a -> RBST k a -> RBST k a
+difference (RBST s t1) (RBST _ t2) = runRand (diff t1 t2) s
+  where
+  diff Empty b = return b
+  diff (Node _ k l x r) b = do
+    (rep, bL, bR) <- split k b
+    dL <- diff l bL
+    dR <- diff r bR
     if rep then join dL dR
            else pure $ recomputeSize (Node 0 k dL x dR)
 {-# INLINEABLE difference #-}
+-- I think this requires rebalancing to be truly random.
 
 ----------------------------------------------
 -- Random
@@ -342,8 +498,11 @@ uniformR (x1, x2)
   | n == 0    = error "Check uniformR"
   | otherwise = loop
   where
-    (# i,j #) | x1 < x2   = (# x1, x2 #)
-              | otherwise = (# x2, x1 #)
+    -- Unboxed tuples give me errors when loaded with ghci/ghcid.
+    -- (# i,j #) | x1 < x2   = (# x1, x2 #)
+    --           | otherwise = (# x2, x1 #)
+    (i,j) | x1 < x2   = (x1, x2)
+          | otherwise = (x2, x1)
     n = 1 + (j - i)
     buckets = maxBound `div` n
     maxN = buckets * n -- rounding
