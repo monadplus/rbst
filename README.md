@@ -1,7 +1,9 @@
-## rbst
+## rbst: efficient randomized binary search trees
 
 ![RBST nodes](./images/rbst.png)
+[![Hackage](https://img.shields.io/hackage/v/rbst.svg)](https://hackage.haskell.org/package/rbst)
 [![Build Status](https://travis-ci.org/monadplus/RBST.svg?branch=master)](https://travis-ci.org/monadplus/RBST)
+[![MIT license](https://img.shields.io/github/license/monadplus/rbst)](LICENSE)
 
 Efficient implementation of the [Randomized Binary Search Trees][1] data structure.
 
@@ -25,9 +27,11 @@ _Randomized Binary Search Trees_ are useful when you __cannot make assumptions o
 
 ### Acknowledgement
 
-To [C.Martinez](https://www.cs.upc.edu/~conrado/) and [S.Roura](https://www.cs.upc.edu/~roura/) for their work.
+To the authors [C. Martinez](https://www.cs.upc.edu/~conrado/) and [S. Roura](https://www.cs.upc.edu/~roura/).
 
-To [Dmitrii Kovanikov](https://github.com/chshersh) for his project [implicit treap][2], which has been a reference for me.
+To [D. Kovanikov](https://github.com/chshersh) and his project [implicit treap][2].
+
+Icons designed by [Freepik](http://www.freepik.com) from [www.flaticon.com](https://www.flaticon.com/).
 
 [1]: http://akira.ruc.dk/~keld/teaching/algoritmedesign_f08/Artikler/03/Martinez97.pdf
 [2]: https://github.com/chshersh/treap
