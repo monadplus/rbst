@@ -43,11 +43,12 @@
 -- 2. The associated value.
 -- 3. The size of the tree.
 --
--- You can try it:
+-- You can try it yourself:
 --
--- >>> insert "w" 5 tree
---
--- >>> delete "u" tree
+-- @
+-- > insert "w" 5 tree
+-- > delete "u" tree
+-- @
 --
 -- >>> lookup "y" tree
 -- Just 3
@@ -61,7 +62,7 @@
 --      |-- ("z",1) [1]
 --      |
 --      \__ ("x",2) [1]
---
+-- <BLANKLINE>
 --
 -- == Implementation
 --

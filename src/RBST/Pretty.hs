@@ -25,6 +25,9 @@ import           Data.Char     (isSpace)
 import           Data.List     (dropWhileEnd, intercalate)
 import           RBST.Internal (RBST (..), Size (..), Tree (..), withTree)
 
+-- $setup
+-- >>> import GHC.Exts
+
 -- | Pretty 2-dimensional ASCII drawing of a 'RBST'.
 --
 -- See 'RBST.Pretty.prettyPrint' for an example.
@@ -75,6 +78,7 @@ compact = withTree drawComptact
 --              |-- ('c',3) [1]
 --              |
 --              \__ ('a',1) [1]
+-- <BLANKLINE>
 compactPrint :: (Show k, Show a) => RBST k a -> IO ()
 compactPrint = putStrLn . compact
 

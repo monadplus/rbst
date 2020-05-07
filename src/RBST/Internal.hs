@@ -99,6 +99,10 @@ data RBST k a = RBST
   } deriving stock (Show, Generic, Foldable)
 
 -- | (<>) is implemented via 'merge'.
+--
+-- __Note__: Unlawful instance.
+--
+-- TODO: require Semigroup a and use 'unionWith'
 instance Ord k => Semigroup (RBST k a) where
     (<>) = union
 
@@ -112,7 +116,7 @@ instance (Eq k, Eq a) => Eq (RBST k a) where
 
 -- | Create a tree from a list of key\/value pairs, and viceversa.
 --
--- __NOTE__: This requires @{-# LANGUAGE OverloadedLists #-}@ enabled.
+-- __NOTE__: This requires /-XOverloadedLists/ enabled.
 --
 -- Functions have the following time complexity:
 --
@@ -247,10 +251,10 @@ sizeTreeInt (Node !s _ _ _ _) = fromIntegral (coerce s :: Word64)
 -- -1
 --
 -- >>> height (one 'x' 1)
--- 1
+-- 0
 --
 -- >>> height (one 'x' 1 <> one 'y' 2)
--- 2
+-- 1
 height :: RBST k a -> Int
 height = withTree height'
   where
@@ -287,12 +291,7 @@ lookup k1 = withTree lookup'
 --
 -- @
 -- > insert 'x' 1 empty == one 'x' 1
---
--- -- Notice, this is not equivalent due to randomness.
--- > insert 'x' 1 tree /= insert 'x' 1 (insert 'x' 1 tree)
 -- @
---
--- >>> insert 'c' 4 (zip [] :: )
 insert :: Ord k => k -> a -> RBST k a -> RBST k a
 insert k x RBST{..} = runRand (insert' k x rbstTree) rbstGen
 {-# INLINEABLE insert #-}
@@ -307,9 +306,9 @@ insert' k x node@(Node s !k2 l _ r) = do
             if rep then pushDown tree
                    else pure tree
   else if k < k2
-    then recomputeSize . updateL node <$> insert' k x l
+    then updateL node <$> insert' k x l
   else
-    recomputeSize . updateR node <$> insert' k x r
+    updateR node <$> insert' k x r
 {-# INLINEABLE insert' #-}
 
 ----------------------------------------------
@@ -328,10 +327,10 @@ delete k RBST{..} = runRand (delete' k rbstTree) rbstGen
 -- | 'delete' for 'Tree'\'s in the 'MonadRand'.
 delete' :: Ord k => k -> Tree k a -> MonadRand (Tree k a)
 delete' _ Empty = return Empty
-delete' k (Node _ k2 l _ r)
+delete' k node@(Node _ k2 l _ r)
   | k == k2   = join l r
-  | k < k2    = delete' k l
-  | otherwise = delete' k r
+  | k < k2    = updateL node <$> delete' k l
+  | otherwise = updateR node <$> delete' k r
 {-# INLINEABLE delete' #-}
 
 ----------------------------------------
@@ -343,10 +342,10 @@ delete' k (Node _ k2 l _ r)
 -- __NOTE__: \(0 \leq i \leq n\), where /n/ is the size of the tree.
 --
 -- >>> let tree = fromList [('a',1), ('b', 2), ('c',3)] :: RBST Char Int
--- >>> lookupByRank 0 tree
--- Just ('a', 1)
--- >>> lookupByRank 2 tree
--- Just ('c', 3)
+-- >>> at 0 tree
+-- Just ('a',1)
+-- >>> at 2 tree
+-- Just ('c',3)
 at :: Int -> RBST k a -> Maybe (k, a)
 at ith = withTree (at' ith)
   where
@@ -363,16 +362,19 @@ at ith = withTree (at' ith)
 -- __NOTE__: \(0 \leq i \leq n\), where /n/ is the size of the tree.
 --
 -- >>> let tree = fromList [('a',1), ('b', 2), ('c',3)] :: RBST Char Int
--- >>> toList $ deleteByRank 0 tree
--- [('b', 2), ('c',3)]
+-- >>> toList $ remove 0 tree
+-- [('b',2),('c',3)]
 remove :: Int -> RBST k a -> RBST k a
-remove ith RBST{..} = runRand (deleteByRank' ith rbstTree) rbstGen
+remove n rbst@RBST{..}
+  | n < 0          = rbst
+  | n >= size rbst = rbst
+  | otherwise      = runRand (go n rbstTree) rbstGen
   where
-    deleteByRank' _ Empty = return Empty
-    deleteByRank' i (Node _ _ l _ r)
-      | i < sizeL  = deleteByRank' i l
-      | i == sizeL = join l r
-      | otherwise  = deleteByRank' (i - (sizeL + 1)) r
+    go _ Empty = return Empty
+    go !i node@(Node _ _ l _ r)
+      | i < sizeL  = updateL node <$> (go i l)
+      | i == sizeL = l `join` r
+      | otherwise  = updateR node <$> (go (i - (sizeL + 1)) r)
       where sizeL = sizeTreeInt l
 {-# INLINEABLE remove #-}
 
@@ -384,18 +386,16 @@ remove ith RBST{..} = runRand (deleteByRank' ith rbstTree) rbstGen
 -- 2. If \( i \geq n \), then the result is @t@.
 take :: Int -> RBST k a -> RBST k a
 take n rbst@RBST{..}
-  | n <= 0         = rbst
-  | n >= size rbst = RBST rbstGen Empty
-  | otherwise      = runRand (go n rbstTree) rbstGen
+  | n <= 0         = RBST rbstGen Empty
+  | n >= size rbst = rbst
+  | otherwise      = RBST rbstGen (go n rbstTree)
   where
-    go _ Empty = return Empty
-    go 0 t     = return t
+    go _ Empty = Empty
+    go 0 _     = Empty
     go i node@(Node _ _ l _ r)
       | i < sizeL  = go i l
-      | i == sizeL = return l
-      | otherwise  = do
-          newR <- go (i - (sizeL + 1)) r
-          return $ recomputeSize $ updateR node newR
+      | i == sizeL = l
+      | otherwise  = updateR node (go (i - (sizeL + 1)) r)
       where sizeL = sizeTreeInt l
 {-# INLINEABLE take #-}
 
@@ -405,17 +405,17 @@ take n rbst@RBST{..}
 --
 -- 1. If \( i \leq 0 \), then the result is @t@.
 -- 2. If \( i \geq n \), then the result is 'empty'.
-drop :: Ord k => Int -> RBST k a -> RBST k a
+drop :: Int -> RBST k a -> RBST k a
 drop n rbst@RBST{..}
   | n <= 0         = rbst
   | n >= size rbst = RBST rbstGen Empty
-  | otherwise      = runRand (go n rbstTree) rbstGen
+  | otherwise      = RBST rbstGen (go n rbstTree)
   where
-    go _ Empty = return Empty
-    go 0 t     = return t
-    go i (Node _ k l x r)
-      | i < sizeL  = go i l
-      | i == sizeL = insert' k x r
+    go _ Empty = Empty
+    go !0 t     = t
+    go !i node@(Node _ _ l _ r)
+      | i < sizeL  = updateL node (go i l)
+      | i == sizeL = updateL node Empty
       | otherwise  = go (i - (sizeL + 1)) r
       where sizeL = sizeTreeInt l
 {-# INLINEABLE drop #-}
@@ -423,6 +423,8 @@ drop n rbst@RBST{..}
 ----------------------------------------------
 -- Set operations
 ----------------------------------------------
+
+-- TODO: 'unionWith' that uses a Semigroup on a.
 
 -- | \( \theta(m + n) \). Union of two 'RBST'.
 --
@@ -639,7 +641,7 @@ recomputeSize (Node _ k l c r) =
 -- will probably need to call 'recomputeSize'.
 updateL :: Tree k a -> Tree k a -> Tree k a
 updateL Empty newL            = newL
-updateL (Node s k _ c r) newL = Node s k newL c r
+updateL (Node s k _ c r) newL = recomputeSize (Node s k newL c r)
 {-# INLINE updateL #-}
 
 -- | \( O(1) \). Update the right node with the given subtree.
@@ -648,7 +650,7 @@ updateL (Node s k _ c r) newL = Node s k newL c r
 -- will probably need to call 'recomputeSize'.
 updateR :: Tree k a -> Tree k a -> Tree k a
 updateR Empty newR            = newR
-updateR (Node s k l c _) newR = Node s k l c newR
+updateR (Node s k l c _) newR = recomputeSize (Node s k l c newR)
 {-# INLINE updateR #-}
 
 -- | \(O(\log \n )\). Insert node at root using 'split' and recompute the size.
@@ -669,14 +671,14 @@ split _ Empty = return (False, Empty, Empty)
 split k node@(Node _ k2 l _ r)
   | k < k2 = do
     (b, t1, t2) <- split k l
-    return (b, t1, recomputeSize (updateL node t2))
+    return (b, t1, updateL node t2)
   | k == k2 = do
       (_, t1, t2) <- split k r
       newT1       <- join l t1
       return (True, newT1, t2)
   | otherwise = do
       (b, t1, t2) <- split k r
-      return (b, recomputeSize (updateR node t1), t2)
+      return (b, updateR node t1, t2)
 {-# INLINE split #-}
 
 -- | Given a BST where left and right subtrees are random BST, returns a completly random BST.
@@ -690,9 +692,9 @@ pushDown tree@(Node _ _ l _ r) = do
       !total = m + n
   u <- uniformR (0, total)
   if u < m
-    then updateR l <$> (pushDown $ recomputeSize $ updateL tree (getR l))
+    then updateR l <$> (pushDown $ updateL tree (getR l))
   else if u < total
-    then updateL r <$> (pushDown $ recomputeSize $ updateR tree (getL r))
+    then updateL r <$> (pushDown $ updateR tree (getL r))
   else
     return tree
 
@@ -705,6 +707,6 @@ join p Empty = return p
 join p@(Node s _ _ _ pR) q@(Node s2 _ qL _ _) = do
   guess <- uniformR (0, unSize (s + s2))
   if guess < unSize s
-    then recomputeSize . updateR p <$> join pR q
-    else recomputeSize . updateL q <$> join p  qL
+    then updateR p <$> join pR q
+    else updateL q <$> join p  qL
 {-# INLINE join #-}

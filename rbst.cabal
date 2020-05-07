@@ -104,13 +104,18 @@ Test-suite rbst-tests
   hs-source-dirs:       test
   main-is:              Spec.hs
   other-modules:        Test.Common
+                         Test.RBST.CutsSpec
+                         Test.RBST.LawsSpec
                          Test.RBST.QuerySpec
+                         Test.RBST.SetOpsSpec
+                         Test.RBST.UpdateSpec
 
   build-depends:        rbst,
-                        base              >=4.12     && <4.14,
-                        hspec             >=2.6.0    && <2.8,
-                        hspec-core        >=2.6.0    && <2.8,
-                        QuickCheck        >=2.12     && <2.14
+                        base               >=4.12     && <4.14,
+                        hspec              >=2.6.0    && <2.8,
+                        hspec-expectations >=0.8.0    && <0.9,
+                        hspec-core         >=2.6.0    && <2.8,
+                        QuickCheck         >=2.12     && <2.14
 
   ghc-options:          -Wall
                         -Wincomplete-uni-patterns
@@ -194,15 +199,16 @@ Test-suite rbst-doctest
 
 
 
-Benchmark rbst
+Benchmark rbst-bench
   default-language: Haskell2010
   type:           exitcode-stdio-1.0
   hs-source-dirs: benchmark
   main-is:        Benchmark.hs
 
   build-depends:  rbst,
-                  base      >=4.12     && <4.14,
-                  gauge     >=0.2.4    && <0.3
+                  base       >=4.12     &&  <4.14,
+                  gauge      >=0.2.4    &&  <0.3,
+                  mwc-random >= 0.14.0  &&  <0.15
 
   ghc-options:    -Wall
                   -Wincomplete-uni-patterns
