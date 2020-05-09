@@ -1,13 +1,15 @@
 --------------------------------------------------------------------
 -- |
 -- Module      : RBST.Pretty
--- Copyright   : (C) Arnau Abella 2020
+-- Copyright   : (c) 2020 Arnau Abella, Dmitrii Kovanikov
 -- License     : MIT (see the file LECENSE)
 -- Maintainer  : Arnau Abella arnauabell@gmail.com
 -- Stability   : experimental
 -- Portability : non-portable
 --
 -- 'RBST' visualization.
+--
+-- 'prettyPrint' was copied from @treap@ package wrote by Dmitrii Kovanikov.
 --
 --------------------------------------------------------------------
 module RBST.Pretty (

@@ -1,7 +1,7 @@
 cabal-version:       >= 1.10
 
 name:                rbst
-version:             0.0.0.0
+version:             0.0.0.1
 build-type:          Simple
 license:             MIT
 license-file:        LICENSE

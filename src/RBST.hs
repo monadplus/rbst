@@ -1,7 +1,7 @@
 --------------------------------------------------------------------
 -- |
 -- Module      :  RBST
--- Copyright   :  (c) Arnau Abella 2020
+-- Copyright   :  (c) 2020 Arnau Abella, Dmitrii Kovanikov
 -- License     :  MIT (see the file LICENSE)
 -- Maintainer  :  Arnau Abella arnauabell@gmail.com
 -- Stability   :  experimental

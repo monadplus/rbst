@@ -1,8 +1,8 @@
 --------------------------------------------------------------------
 -- |
 -- Module      :  RBST.Internal
--- Copyright   :  (c) Arnau Abella 2020
--- License     :  MIT
+-- Copyright   :  (c) 2020 Arnau Abella, Dmitrii Kovanikov
+-- License     :  MIT (see the file LECENSE)
 -- Maintainer  :  arnauabell@gmail.com
 -- Stability   :  experimental
 -- Portability :  non-portable

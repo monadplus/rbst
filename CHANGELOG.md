@@ -7,7 +7,11 @@ The changelog is available [on GitHub][2].
 
 * Work in progress.
 
-## 0.0.0.0 — Unreleased
+## 0.0.0.1 — May 9, 2020
+
+* Update copyright to include credit to Dmitrii Kovanikov work.
+
+## 0.0.0.0 — May 9, 2020
 
 * First release including modules `RBST` and `RBST.Pretty`.
 
