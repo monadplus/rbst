@@ -111,7 +111,7 @@ Test-suite rbst-tests
                          Test.RBST.UpdateSpec
 
   build-depends:        rbst,
-                        base               >=4.12     && <4.14,
+                        base,
                         hspec              >=2.6.0    && <2.8,
                         hspec-expectations >=0.8.0    && <0.9,
                         hspec-core         >=2.6.0    && <2.8,
@@ -178,7 +178,7 @@ Test-suite rbst-doctest
   hs-source-dirs:      test
   main-is:             Doctest.hs
 
-  build-depends:       base     >=4.12 && <4.14,
+  build-depends:       base,
                        doctest  >=0.16 && <0.17,
                        Glob     >=0.9  && <0.11
 
@@ -206,7 +206,7 @@ Benchmark rbst-bench
   main-is:        Benchmark.hs
 
   build-depends:  rbst,
-                  base       >=4.12     &&  <4.14,
+                  base,
                   gauge      >=0.2.4    &&  <0.3,
                   mwc-random >= 0.14.0  &&  <0.15
 

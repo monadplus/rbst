@@ -2,6 +2,7 @@
 
 ![RBST nodes](./images/rbst.png)
 [![Hackage](https://img.shields.io/hackage/v/rbst.svg)](https://hackage.haskell.org/package/rbst)
+[![GitHub CI](https://github.com/monadplus/rbst/workflows/CI/badge.svg)](https://github.com/monadplus/rbst/actions)
 [![Build Status](https://travis-ci.org/monadplus/RBST.svg?branch=master)](https://travis-ci.org/monadplus/RBST)
 [![MIT license](https://img.shields.io/github/license/monadplus/rbst)](LICENSE)
 
