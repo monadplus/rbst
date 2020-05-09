@@ -17,7 +17,7 @@ matrix:
 
 before_install:
   # HLint check
-  - curl -sSL https://raw.github.com/ndmitchell/neil/master/misc/travis.sh | sh -s -- hlint co-log-core/ co-log/src/ co-log-benchmark/
+  - curl -sSL https://raw.github.com/ndmitchell/neil/master/misc/travis.sh | sh
 
 install:
   # install stack and build project
@@ -26,10 +26,7 @@ install:
   - stack build --test --no-run-tests --bench --no-run-benchmarks
 
 script:
-  - stack test  co-log-core
-  - stack test  co-log
-  - stack test  co-log-polysemy
-  - stack build co-log-benchmark
+  - stack test --no-terminal
 
 notifications:
   email: false
