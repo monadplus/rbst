@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections #-}
-module Test.RBST.QuerySpec (
-    spec
+module Test.RBST.Query (
+    querySpec
   ) where
 
 import           GHC.Exts    (IsList (..))
@@ -9,8 +9,8 @@ import           Test.Hspec  (Spec, describe, it, shouldBe)
 
 import qualified RBST
 
-spec :: Spec
-spec = describe "Query tests" $ do
+querySpec :: Spec
+querySpec = describe "Query tests" $ do
     sizeSpec
     heightSpec
     isListSpec

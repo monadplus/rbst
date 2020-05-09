@@ -1,5 +1,5 @@
-module Test.RBST.CutsSpec (
-    spec
+module Test.RBST.Cuts (
+    cutsSpec
   ) where
 
 import           Test.Common (describedAs, smallRBST)
@@ -7,8 +7,8 @@ import           Test.Hspec  (Spec, describe, it, shouldBe)
 
 import qualified RBST
 
-spec :: Spec
-spec = describe "Cuts tests" $ do
+cutsSpec :: Spec
+cutsSpec = describe "Cuts tests" $ do
     takeSpec
     dropSpec
     removeSpec

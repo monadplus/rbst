@@ -1,5 +1,5 @@
-module Test.RBST.LawsSpec (
-    spec
+module Test.RBST.Laws (
+    lawsSpec
   ) where
 
 import           GHC.Exts        (IsList (..))
@@ -9,8 +9,8 @@ import           Test.Hspec.QuickCheck (prop)
 import           Test.QuickCheck
 import           RBST.Pretty (compact)
 
-spec :: Spec
-spec = describe "Law abiding instances" $ do
+lawsSpec :: Spec
+lawsSpec = describe "Law abiding instances" $ do
     --semigroupSpec
     monoidSpec
 

@@ -1,5 +1,5 @@
-module Test.RBST.UpdateSpec (
-    spec
+module Test.RBST.Update (
+    updateSpec
   ) where
 
 import Test.Hspec (Spec, describe, it, shouldBe)
@@ -7,8 +7,8 @@ import Test.Common (smallRBST, describedAs)
 
 import qualified RBST
 
-spec :: Spec
-spec = describe "Modification operations tests" $ do
+updateSpec :: Spec
+updateSpec = describe "Modification operations tests" $ do
   insertSpec
   deleteSpec
 

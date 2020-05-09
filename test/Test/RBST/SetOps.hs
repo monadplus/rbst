@@ -1,5 +1,5 @@
-module Test.RBST.SetOpsSpec (
-    spec
+module Test.RBST.SetOps (
+    setOpsSpec
   ) where
 
 import Test.Hspec (Spec, describe, it)
@@ -9,8 +9,8 @@ import GHC.Exts (IsList(..))
 import           RBST (union)
 import qualified RBST
 
-spec :: Spec
-spec = describe "Set operations tests" $ do
+setOpsSpec :: Spec
+setOpsSpec = describe "Set operations tests" $ do
   unionSpec
   intersectionSpec
   subtractionSpec

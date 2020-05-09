@@ -104,11 +104,12 @@ Test-suite rbst-tests
   hs-source-dirs:       test
   main-is:              Spec.hs
   other-modules:        Test.Common
-                         Test.RBST.CutsSpec
-                         Test.RBST.LawsSpec
-                         Test.RBST.QuerySpec
-                         Test.RBST.SetOpsSpec
-                         Test.RBST.UpdateSpec
+                        Test.RBST
+                          Test.RBST.Cuts
+                          Test.RBST.Laws
+                          Test.RBST.Query
+                          Test.RBST.SetOps
+                          Test.RBST.Update
 
   build-depends:        rbst,
                         base,
