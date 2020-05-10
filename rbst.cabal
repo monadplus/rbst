@@ -14,10 +14,10 @@ synopsis:            Randomized Binary Search Trees
 description:
     .
     This package contains an implementation of a [Randomized
-    Binary Search Tree](http://akira.ruc.dk/~keld/teaching/algoritmedesign_f08/Artikler/03/Martinez97.pdf).
+    Binary Search Tree](https://www.cs.upc.edu/~conrado/research/papers/jacm-mr98.pdf).
     .
     Randomized Binary Search Trees are guaranteed to be /Random BST/ irrespective of the number
-    of @'insert'@ \/ @'delete'@ operations. This guarantees logarithmic time operations (with a constant factor) in the worst case.
+    of @'insert'@ \/ @'delete'@ operations. This guarantees logarithmic time operations w.h.p. in the average case.
 category:            Data Structures
 extra-source-files:  README.md
                      CHANGELOG.md

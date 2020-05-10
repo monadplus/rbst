@@ -12,20 +12,21 @@ Efficient implementation of the [Randomized Binary Search Trees][1] data structu
 
 _Randomized Binary Search Trees_ are useful when you __cannot make assumptions on the input distribution__ but you still need fast (logarithmic time complexity) `insert`/`lookup`/`delete`/`at`/`union`/etc. operations. It is guaranteed efficient self-balancing. Below you can find the table of time complexity for all operations (where `n` is the size of the tree):
 
-| Operation      | Time complexity | Description                                    |
-|----------------|-----------------|------------------------------------------------|
-| `size`         | `O(1)`          | Count elements in the tree                     |
-| `lookup`       | `O(log n)`      | Access by key                                  |
-| `insert`       | `O(log n)`      | Insert an element with the given key           |
-| `delete`       | `O(log n)`      | Delete the element associated to the given key |
-| `take`         | `O(log n)`      | Take first i-th elements                       |
-| `drop`         | `O(log n)`      | Drop first i-th elements                       |
-| `at`           | `O(log n)`      | Access by index                                |
-| `remove`       | `O(log n)`      | Remove the i-th element                        |
-| `union`        | `O(m + n)`      | Union of two trees                             |
-| `intersection` | `O(m + n)`      | Intersection of two trees                      |
-| `subtraction`  | `O(m + n)`      | Subtraction of two trees                       |
-| `difference`   | `O(m + n)`      | Symmetric difference of two trees              |
+| Operation      | Time complexity  | Description                                    |
+|----------------|------------------|------------------------------------------------|
+| `size`         | `O(1)`           | Count elements in the tree                     |
+| `height`       | `O(log n)` w.h.p | Height of the tree                             |
+| `lookup`       | `O(log n)`       | Access by key                                  |
+| `insert`       | `O(log n)`       | Insert an element with the given key           |
+| `delete`       | `O(log n)`       | Delete the element associated to the given key |
+| `take`         | `O(log n)`       | Take first i-th elements                       |
+| `drop`         | `O(log n)`       | Drop first i-th elements                       |
+| `at`           | `O(log n)`       | Access by index                                |
+| `remove`       | `O(log n)`       | Remove the i-th element                        |
+| `union`        | `O(m + n)`       | Union of two trees                             |
+| `intersection` | `O(m + n)`       | Intersection of two trees                      |
+| `subtraction`  | `O(m + n)`       | Subtraction of two trees                       |
+| `difference`   | `O(m + n)`       | Symmetric difference of two trees              |
 
 ### Usage example
 
@@ -117,6 +118,6 @@ To [D. Kovanikov](https://github.com/chshersh) and his project [implicit treap][
 
 Icons designed by [Freepik](http://www.freepik.com) from [www.flaticon.com](https://www.flaticon.com/).
 
-[1]: http://akira.ruc.dk/~keld/teaching/algoritmedesign_f08/Artikler/03/Martinez97.pdf
+[1]: https://www.cs.upc.edu/~conrado/research/papers/jacm-mr98.pdf
 [2]: https://github.com/chshersh/treap
 [3]: https://www.stackage.org/

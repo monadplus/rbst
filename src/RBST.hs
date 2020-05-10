@@ -68,7 +68,7 @@
 --
 -- The implementation of /Randomized Binary Search Trees/ is based on:
 --
--- * Conrado Martinez and Salvador Roura, \"/Randomized Binary Search Trees/\", January 1997, <http://akira.ruc.dk/~keld/teaching/algoritmedesign_f08/Artikler/03/Martinez97.pdf>.
+-- * C. Martinez and S. Roura. \"/Randomized Binary Search Trees/\", Journal of the ACM, Vol. 45, No. 2, March 1998, pp. 288–323. <http://akira.ruc.dk/~keld/teaching/algoritmedesign_f08/Artikler/03/Martinez97.pdf>
 --
 --------------------------------------------------------------------
 module RBST (
@@ -85,6 +85,7 @@ module RBST (
   -- * Query functions
   , size
   , height
+  , height'
   , lookup
   , at
 

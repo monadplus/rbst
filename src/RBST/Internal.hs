@@ -35,6 +35,7 @@ module RBST.Internal (
   , size
   , sizeTree
   , height
+  , height'
   , lookup
   , at
 
@@ -228,24 +229,24 @@ oneTree k x = Node 1 k Empty x Empty
 -- Query
 ----------------------------------------------
 
--- | \( O(1) \). Return the size of the 'RBST'.
+-- | \( O(1) \)-time. Return the size of the 'RBST'.
 size :: RBST k a -> Int
 size = withTree sizeTreeInt
 {-# INLINE size #-}
 
--- | \( O(1) \). Return the 'Size' of the 'Tree'.
+-- | \( O(1) \)-time. Return the 'Size' of the 'Tree'.
 sizeTree :: Tree k a -> Size
 sizeTree Empty             = 0
 sizeTree (Node !s _ _ _ _) = s
 {-# INLINE sizeTree #-}
 
--- | \( O(1) \). Return the size of the 'Tree'.
+-- | \( O(1) \)-time. Return the size of the 'Tree'.
 sizeTreeInt :: Tree k a -> Int
 sizeTreeInt Empty             = 0
 sizeTreeInt (Node !s _ _ _ _) = fromIntegral (coerce s :: Word64)
 {-# INLINE sizeTreeInt #-}
 
--- | \( O(n) \). Height of the tree.
+-- | \( O(n) \)-time worst-case. Height of the tree.
 --
 -- >>> height (empty :: RBST Char Int)
 -- -1
@@ -256,14 +257,25 @@ sizeTreeInt (Node !s _ _ _ _) = fromIntegral (coerce s :: Word64)
 -- >>> height (one 'x' 1 <> one 'y' 2)
 -- 1
 height :: RBST k a -> Int
-height = withTree height'
+height = withTree go
   where
-    height' :: Tree k a -> Int
-    height'            Empty = -1
-    height' (Node _ _ l _ r) = 1 + max (height' l) (height' r)
+    go :: Tree k a -> Int
+    go            Empty = -1
+    go (Node _ _ l _ r) = 1 + max (go l) (go r)
 {-# INLINEABLE height #-}
 
--- | \( O(\log \ n) \). Lookup the value at the key in the tree.
+-- | \( O(log n) \)-time with high probability. Height of the tree.
+--
+-- This version is faster than 'height' but we introduce a very small probabilistic error.
+height' :: RBST k a -> Int
+height' = withTree go
+  where
+    go :: Tree k a -> Int
+    go            Empty = -1
+    go (Node _ _ _ _ r) = 1 + (go r)
+{-# INLINEABLE height' #-}
+
+-- | \( O(\log \ n) \)-time. Lookup the value at the key in the tree.
 --
 -- >>> lookup 'A' (empty :: RBST Char Int)
 -- Nothing
@@ -284,7 +296,7 @@ lookup k1 = withTree lookup'
 -- Insertion
 ----------------------------------------------
 
--- | \( O(\log \ n) \). Insert a new key\/value pair in the tree.
+-- | \( O(\log \ n) \)-time. Insert a new key\/value pair in the tree.
 --
 -- If the key is already present in the map, the associated value is
 -- replaced with the supplied value.
@@ -315,7 +327,7 @@ insert' k x node@(Node s !k2 l _ r) = do
 -- Deletion
 ----------------------------------------------
 
--- | \( O(\log \ n) \). Delete a key and its value from the map. When the key is not a member of the map, the original map is returned.
+-- | \( O(\log \ n) \)-time. Delete a key and its value from the map. When the key is not a member of the map, the original map is returned.
 --
 -- @
 -- > delete 1 (one (1, "A")) == empty
@@ -337,7 +349,7 @@ delete' k node@(Node _ k2 l _ r)
 -- Query by Rank
 ----------------------------------------
 
--- | \( O(\log \ n) \). Get the i-th element of the tree.
+-- | \( O(\log \ n) \)-time. Get the i-th element of the tree.
 --
 -- __NOTE__: \(0 \leq i \leq n\), where /n/ is the size of the tree.
 --
@@ -357,7 +369,7 @@ at ith = withTree (at' ith)
       where sizeL = sizeTreeInt l
 {-# INLINEABLE at #-}
 
--- | \( O(\log \ n) \). Delete the i-th element of the tree.
+-- | \( O(\log \ n) \)-time. Delete the i-th element of the tree.
 --
 -- __NOTE__: \(0 \leq i \leq n\), where /n/ is the size of the tree.
 --
@@ -378,7 +390,7 @@ remove n rbst@RBST{..}
       where sizeL = sizeTreeInt l
 {-# INLINEABLE remove #-}
 
--- | \( O(\log n) \). Returns the first @i@-th elements of the given tree @t@ of size @n@.
+-- | \( O(\log n) \)-time. Returns the first @i@-th elements of the given tree @t@ of size @n@.
 --
 -- __Note__:
 --
@@ -399,7 +411,7 @@ take n rbst@RBST{..}
       where sizeL = sizeTreeInt l
 {-# INLINEABLE take #-}
 
--- | \( O(\log n) \). Returns the tree @t@ without the first @i@-th elements.
+-- | \( O(\log n) \)-time. Returns the tree @t@ without the first @i@-th elements.
 --
 -- __Note__:
 --
@@ -426,7 +438,7 @@ drop n rbst@RBST{..}
 
 -- TODO: 'unionWith' that uses a Semigroup on a.
 
--- | \( \theta(m + n) \). Union of two 'RBST'.
+-- | \( \theta(m + n) \)-time. Union of two 'RBST'.
 --
 -- In case of duplication, only one key remains by a random choice.
 union :: Ord k => RBST k a -> RBST k a -> RBST k a
@@ -450,7 +462,7 @@ union (RBST s tree1) (RBST _ tree2) = runRand (union' tree1 tree2) s
 {-# INLINEABLE union #-}
 
 
--- | \( \theta(m + n) \). Intersection of two 'RBST'.
+-- | \( \theta(m + n) \)-time. Intersection of two 'RBST'.
 intersection :: Ord k => RBST k a -> RBST k a -> RBST k a
 intersection (RBST s t1) (RBST _ t2) = runRand (intersect' t1 t2) s
   where
@@ -463,7 +475,7 @@ intersection (RBST s t1) (RBST _ t2) = runRand (intersect' t1 t2) s
            else join iL iR
 {-# INLINEABLE intersection #-}
 
--- | \( \theta(m + n) \). Difference (subtraction) of two 'RBST'.
+-- | \( \theta(m + n) \)-time. Difference (subtraction) of two 'RBST'.
 subtraction :: Ord k => RBST k a -> RBST k a -> RBST k a
 subtraction (RBST s t1) (RBST _ t2) = runRand (subtraction' t1 t2) s
   where
@@ -476,7 +488,7 @@ subtraction (RBST s t1) (RBST _ t2) = runRand (subtraction' t1 t2) s
            else pure $ recomputeSize (Node 0 k dL x dR)
 {-# INLINEABLE subtraction #-}
 
--- | \( \theta(m + n) \). Difference (disjunctive union) of two 'RBST'.
+-- | \( \theta(m + n) \)-time. Difference (disjunctive union) of two 'RBST'.
 difference :: Ord k => RBST k a -> RBST k a -> RBST k a
 difference (RBST s t1) (RBST _ t2) = runRand (diff t1 t2) s
   where
@@ -524,12 +536,6 @@ uniformR (x1, x2)
 runRand :: MonadRand (Tree k a) -> Random.PureMT -> RBST k a
 runRand r s = let (tree, s') = State.runState r s in RBST s' tree
 
--- | Returns the key of the 'Node' or 'Nothing'.
--- getKey :: Tree k a -> Maybe k
--- getKey Empty = Nothing
--- getKey (Node _ k _ _ _) = Just k
--- {-# INLINE getKey #-}
-
 -- | Return the left subtree or empty.
 getL :: Tree k a -> Tree k a
 getL Empty            = Empty
@@ -542,24 +548,10 @@ getR Empty            = Empty
 getR (Node _ _ _ _ r) = r
 {-# INLINE getR #-}
 
--- | 'fmap' over 'rbstGen'.
--- overGen :: (Random.PureMT -> Random.PureMT) -> RBST k a -> RBST k a
--- overGen f RBST{..} = RBST (f rbstGen) rbstTree
--- {-# INLINE overGen #-}
-
--- | Set a new 'rbstGen'.
--- setGen :: Random.PureMT -> RBST k a -> RBST k a
--- setGen newGen = overGen (const newGen)
--- {-# INLINE setGen #-}
-
 -- | Lift a function from 'Tree' to 'RBST'.
 withTree :: (Tree k a -> r) -> (RBST k a -> r)
 withTree f = f . rbstTree
 {-# INLINE withTree #-}
-
--- overTree :: (Tree k a -> Tree k a) -> (RBST k a -> RBST k a)
--- overTree f RBST{..} = RBST rbstGen (f rbstTree)
--- {-# INLINE overTree #-}
 
 -- | \( O(1) \). Recompute tree size after modification
 recomputeSize :: Tree k a -> Tree k a
@@ -568,74 +560,7 @@ recomputeSize (Node _ k l c r) =
   let !s = sizeTree l + sizeTree r + 1 in Node s k l c r
 {-# INLINE recomputeSize #-}
 
--- | \( O(1) \). Rotate tree to the left.
---
--- Before
---
---        ╱╲
---       ╱  ╲
---      ╱    ╲
---     ╱      ╲
---    ╱╲       C
---   ╱  ╲
---  ╱    ╲
--- A      B
---
--- After
---
---       ╱╲
---      ╱  ╲
---     ╱    ╲
---    ╱      ╲
---   A       ╱╲
---          ╱  ╲
---         ╱    ╲
---        B      C
---
--- rotateR :: Tree k a -> Tree k a
--- rotateR Empty = Empty
--- rotateR node@(Node _ _ Empty _ _) = node
--- rotateR (Node s k (Node _ k2 l2 c2 r2) c r) =
---   Node s k2 l2 c2 newR
---   where
---     newR = recomputeSize $ Node s k r2 c r
--- {-# INLINEABLE rotateR #-}
-
--- | \( O(1) \). Rotate tree to the left.
---
---
--- Before
---
---       ╱╲
---      ╱  ╲
---     ╱    ╲
---    ╱      ╲
---   A       ╱╲
---          ╱  ╲
---         ╱    ╲
---        B      C
---
--- After
---
---        ╱╲
---       ╱  ╲
---      ╱    ╲
---     ╱      ╲
---    ╱╲       C
---   ╱  ╲
---  ╱    ╲
--- A      B
---
--- rotateL :: Tree k a -> Tree k a
--- rotateL Empty = Empty
--- rotateL node@(Node _ _ _ _ Empty) = node
--- rotateL (Node s k l c (Node _ k2 l2 c2 r2)) =
---   Node s k2 newL c2 r2
---   where
---     newL = recomputeSize $ Node s k l c l2
--- {-# INLINE rotateL #-}
-
--- | \( O(1) \). Update the left node with the given subtree.
+-- | \( O(1) \)-time. Update the left node with the given subtree.
 --
 -- Notice, the size is not recomputed so you
 -- will probably need to call 'recomputeSize'.
@@ -644,7 +569,7 @@ updateL Empty newL            = newL
 updateL (Node s k _ c r) newL = recomputeSize (Node s k newL c r)
 {-# INLINE updateL #-}
 
--- | \( O(1) \). Update the right node with the given subtree.
+-- | \( O(1) \)-time. Update the right node with the given subtree.
 --
 -- Notice, the size is not recomputed so you
 -- will probably need to call 'recomputeSize'.
@@ -653,7 +578,7 @@ updateR Empty newR            = newR
 updateR (Node s k l c _) newR = recomputeSize (Node s k l c newR)
 {-# INLINE updateR #-}
 
--- | \(O(\log \n )\). Insert node at root using 'split' and recompute the size.
+-- | \(O(\log \n )\)-time. Insert node at root using 'split' and recompute the size.
 --
 -- __NOTE__: duplicated keys are removed by randomly picking one of them.
 insertRoot :: Ord k => k -> a -> Tree k a -> MonadRand (Bool, Tree k a)
@@ -663,7 +588,7 @@ insertRoot k x tree = do
   return (rep, recomputeSize (Node 0 k l x r))
 {-# INLINE insertRoot #-}
 
--- | \(O(\log \n )\. Split the tree \( T \) into two trees \( T_< \) and \( T_> \), which contain the keys of \( T \) that are smaller than x and larger than x, respectively.
+-- | \(O(\log \n \)-time. Split the tree \( T \) into two trees \( T_< \) and \( T_> \), which contain the keys of \( T \) that are smaller than x and larger than x, respectively.
 --
 -- This is a sligh variant which removes any duplicate of 'k' and returns a bool indicating so.
 split :: Ord k => k -> Tree k a -> MonadRand (Bool, Tree k a, Tree k a)
@@ -698,7 +623,7 @@ pushDown tree@(Node _ _ l _ r) = do
   else
     return tree
 
--- | \(O(\log \ n )\). Invariant: : All keys from p must be strictly smaller than any key of q.
+-- | \(O(\log \ n )\)-time. Invariant: : All keys from p must be strictly smaller than any key of q.
 --
 -- Theorem. The join of two independent random binary search tree is a random binary search tree.
 join :: Tree k a -> Tree k a -> MonadRand (Tree k a)
